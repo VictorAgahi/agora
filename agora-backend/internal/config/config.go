@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -17,7 +18,16 @@ func Load() *Config {
 	port := getEnv("PORT", "8080")
 	env := getEnv("ENVIRONMENT", "development")
 	corsOrigin := getEnv("CORS_ORIGIN", "*")
-	mcpKey := getEnv("MCP_API_KEY", "agora-secret-key-change-me")
+	mcpKey := os.Getenv("MCP_API_KEY")
+	if mcpKey == "" || mcpKey == "agora-secret-key-change-me" {
+		if env == "production" {
+			log.Fatalf("FATAL: MCP_API_KEY must be set in production and cannot use default placeholder")
+		}
+		if mcpKey == "" {
+			mcpKey = "agora-dev-key"
+		}
+		log.Println("WARNING: running with development MCP_API_KEY")
+	}
 
 	// Support DATA_DIR for PVC mounts in Kubernetes
 	dbPath := os.Getenv("DB_PATH")

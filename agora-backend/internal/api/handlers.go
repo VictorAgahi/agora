@@ -39,6 +39,7 @@ func (a *API) HandleListItems(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) HandleAddItem(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
 	var input models.ItemInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json payload")
@@ -93,6 +94,7 @@ func (a *API) HandleUpdateItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var input models.UpdateItemInput
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return

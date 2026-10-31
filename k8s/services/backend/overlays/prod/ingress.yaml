@@ -4,6 +4,7 @@ metadata:
   name: agora-backend
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: agora-prod-security-headers@kubernetescrd
     cert-manager.io/cluster-issuer: cloudflare-issuer
 spec:
   ingressClassName: traefik

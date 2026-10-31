@@ -21,3 +21,8 @@ agora-frontend/.vite/
 .env.local
 .env.*.local
 *.tsbuildinfo
+
+# Secrets & Credentials
+*secret*.yaml
+*.key
+*.pem

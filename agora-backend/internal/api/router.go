@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"log"
 	"net/http"
 	"strings"
@@ -52,7 +53,7 @@ func requireMCPAuth(expectedKey string, next http.Handler) http.Handler {
 		}
 
 		if expectedKey == "" {
-			next.ServeHTTP(w, r)
+			http.Error(w, `{"error":"unauthorized: server authentication key not set"}`, http.StatusUnauthorized)
 			return
 		}
 
@@ -68,7 +69,7 @@ func requireMCPAuth(expectedKey string, next http.Handler) http.Handler {
 			token = r.URL.Query().Get("token")
 		}
 
-		if token != expectedKey {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(expectedKey)) != 1 {
 			http.Error(w, `{"error":"unauthorized: invalid or missing MCP API key"}`, http.StatusUnauthorized)
 			return
 		}
