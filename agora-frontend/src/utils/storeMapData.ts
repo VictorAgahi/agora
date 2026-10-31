@@ -5,6 +5,8 @@ export interface StoreAisle {
   name: string;
   shortLabel: string;
   category: string;
+  emoji: string;
+  accent: string;
   // SVG bounding box coordinates (viewBox 0 0 1000 1024)
   x: number;
   y: number;
@@ -23,9 +25,11 @@ export const STORE_AISLES: StoreAisle[] = [
   // 1. Entrance / Start
   {
     id: 'promo',
-    name: 'Zone Promo',
-    shortLabel: 'Promo',
+    name: 'Zone Promo & Bons Plans',
+    shortLabel: 'Promos',
     category: 'Promotions',
+    emoji: '🏷️',
+    accent: '#f97316',
     x: 293,
     y: 931,
     width: 141,
@@ -38,9 +42,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'fruits-legumes',
-    name: 'Fruits & Légumes',
+    name: 'Fruits & Légumes Frais',
     shortLabel: 'Fruits & Lég.',
     category: 'Fruits & Légumes',
+    emoji: '🍎',
+    accent: '#10b981',
     x: 285,
     y: 796,
     width: 148,
@@ -56,7 +62,7 @@ export const STORE_AISLES: StoreAisle[] = [
       'pasteque', 'pastèque', 'orange', 'mandarine', 'clementine', 'raisin',
       'peche', 'pêche', 'abricot', 'kiwi', 'mangue', 'concombre', 'epinard',
       'échalote', 'echalote', 'poireau', 'brocoli', 'chou', 'herbes', 'persil',
-      'coriandre', 'basilic', 'gingembre'
+      'coriandre', 'basilic', 'gingembre', 'radis', 'haricot vert', 'potimarron'
     ],
   },
   {
@@ -64,6 +70,8 @@ export const STORE_AISLES: StoreAisle[] = [
     name: 'Noix de cajou & Fruits secs',
     shortLabel: 'Fruits Secs',
     category: 'Fruits & Légumes',
+    emoji: '🥜',
+    accent: '#eab308',
     x: 285,
     y: 735,
     width: 113,
@@ -79,9 +87,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'boulangerie-fraiche',
-    name: 'Pain & Boulangerie',
+    name: 'Pain & Boulangerie Artisanale',
     shortLabel: 'Boulangerie',
     category: 'Boulangerie',
+    emoji: '🥖',
+    accent: '#f59e0b',
     x: 456,
     y: 816,
     width: 114,
@@ -99,9 +109,11 @@ export const STORE_AISLES: StoreAisle[] = [
   // 2. Right Side Aisles (Dry grocery, climbing from bottom to top)
   {
     id: 'chips-apero',
-    name: 'Chips & Apéro',
+    name: 'Chips, Apéro & Boissons',
     shortLabel: 'Apéro & Chips',
     category: 'Boissons',
+    emoji: '🍿',
+    accent: '#3b82f6',
     x: 654,
     y: 666,
     width: 303,
@@ -118,9 +130,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'cuisine-monde',
-    name: 'Cuisine du monde',
+    name: 'Cuisine du monde (Mexicain, Asie)',
     shortLabel: 'Monde (Mex, Asie)',
     category: 'Épicerie',
+    emoji: '🌮',
+    accent: '#ef4444',
     x: 657,
     y: 613,
     width: 293,
@@ -137,9 +151,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'epicerie-conserves',
-    name: 'Épicerie & Conserves (Pâtes, Sauces)',
+    name: 'Épicerie (Pâtes, Sauces) & Conserves',
     shortLabel: 'Pâtes / Conserves',
     category: 'Épicerie',
+    emoji: '🍝',
+    accent: '#10b981',
     x: 654,
     y: 556,
     width: 304,
@@ -157,9 +173,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'farine-sucre',
-    name: 'Farine, Sucre, Huile etc.',
+    name: 'Farine, Sucre, Huile & Épices',
     shortLabel: 'Farine & Sucre',
     category: 'Épicerie',
+    emoji: '🌾',
+    accent: '#f59e0b',
     x: 653,
     y: 465,
     width: 285,
@@ -176,9 +194,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'bio-oeufs',
-    name: 'Bio & Œufs',
+    name: 'Bio & Œufs Frais',
     shortLabel: 'Bio & Œufs',
     category: 'Épicerie',
+    emoji: '🥚',
+    accent: '#84cc16',
     x: 646,
     y: 352,
     width: 304,
@@ -195,9 +215,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'pain-sec',
-    name: 'Pain de mie & Biscottes',
+    name: 'Pain de mie, Toast & Biscottes',
     shortLabel: 'Pain de mie',
     category: 'Boulangerie',
+    emoji: '🍞',
+    accent: '#d97706',
     x: 648,
     y: 272,
     width: 303,
@@ -213,9 +235,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'cereales-cafe',
-    name: 'Céréales & Café',
+    name: 'Céréales, Café, Thé & Miel',
     shortLabel: 'Céréales & Café',
     category: 'Épicerie',
+    emoji: '☕',
+    accent: '#78350f',
     x: 648,
     y: 171,
     width: 304,
@@ -232,9 +256,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'hygiene',
-    name: 'Papier / Dentifrice / Vaisselle etc.',
+    name: 'Papier, Dentifrice, Entretien & Vaisselle',
     shortLabel: 'Hygiène & Entretien',
     category: 'Maison & Hygiène',
+    emoji: '🧼',
+    accent: '#06b6d4',
     x: 645,
     y: 21,
     width: 304,
@@ -254,9 +280,11 @@ export const STORE_AISLES: StoreAisle[] = [
   // 3. Central & Upper-Left (Fresh, Meats, Dairy)
   {
     id: 'fromages-frais',
-    name: 'Fromages - Frais',
+    name: 'Fromagerie & Fromages Frais',
     shortLabel: 'Fromages Frais',
     category: 'Produits Frais',
+    emoji: '🧀',
+    accent: '#eab308',
     x: 50,
     y: 359,
     width: 326,
@@ -276,6 +304,8 @@ export const STORE_AISLES: StoreAisle[] = [
     name: 'Crème fraîche liquide & Béchamel',
     shortLabel: 'Crème liquide',
     category: 'Produits Frais',
+    emoji: '🥛',
+    accent: '#93c5fd',
     x: 500,
     y: 340,
     width: 66,
@@ -291,6 +321,8 @@ export const STORE_AISLES: StoreAisle[] = [
     name: 'Pâtes fraîches & Pâtes brisées',
     shortLabel: 'Pâtes Fraîches',
     category: 'Produits Frais',
+    emoji: '🥟',
+    accent: '#facc15',
     x: 541,
     y: 442,
     width: 39,
@@ -307,9 +339,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'viandes-rouge',
-    name: 'Viandes rouges',
+    name: 'Viandes rouges & Boucherie',
     shortLabel: 'Viande Rouge',
     category: 'Boucherie & Poisson',
+    emoji: '🥩',
+    accent: '#f43f5e',
     x: 479,
     y: 458,
     width: 38,
@@ -322,9 +356,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'volailles',
-    name: 'Volailles',
+    name: 'Volailles (Poulet, Dinde, Canard)',
     shortLabel: 'Volailles',
     category: 'Boucherie & Poisson',
+    emoji: '🍗',
+    accent: '#fb923c',
     x: 387,
     y: 457,
     width: 38,
@@ -337,9 +373,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'creme-solide',
-    name: 'Crème fraîche solide',
+    name: 'Crème fraîche épaisse (Pot)',
     shortLabel: 'Crème épaisse',
     category: 'Produits Frais',
+    emoji: '🥣',
+    accent: '#bae6fd',
     x: 353,
     y: 459,
     width: 31,
@@ -352,9 +390,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'sandwich',
-    name: 'Sandwichs & Snacking',
+    name: 'Sandwichs & Snacking Traiteur',
     shortLabel: 'Sandwichs',
     category: 'Produits Frais',
+    emoji: '🥪',
+    accent: '#a3e635',
     x: 477,
     y: 573,
     width: 40,
@@ -367,9 +407,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'jambon-lardons',
-    name: 'Frais, Jambon, Lardons etc.',
+    name: 'Frais, Jambon, Lardons & Saucisses',
     shortLabel: 'Jambon / Lardons',
     category: 'Boucherie & Poisson',
+    emoji: '🥓',
+    accent: '#fb7185',
     x: 541,
     y: 576,
     width: 40,
@@ -382,9 +424,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'charcuterie-traiteur',
-    name: 'Charcuterie, Fromage, Plats cuisinés',
+    name: 'Charcuterie, Fromage & Plats cuisinés',
     shortLabel: 'Charcuterie / Traiteur',
     category: 'Produits Frais',
+    emoji: '🍤',
+    accent: '#f472b6',
     x: 128,
     y: 483,
     width: 170,
@@ -400,10 +444,11 @@ export const STORE_AISLES: StoreAisle[] = [
   },
   {
     id: 'yaourts',
-    name: 'Frais & Yaourts',
+    name: 'Frais, Laits & Yaourts (Mur)',
     shortLabel: 'Frais & Yaourts',
     category: 'Produits Frais',
-    // Representative bounding box for the L-shape wall
+    emoji: '🍓',
+    accent: '#ec4899',
     x: 23,
     y: 476,
     width: 247,
@@ -422,9 +467,11 @@ export const STORE_AISLES: StoreAisle[] = [
   // 4. Frozen Foods (Always last before checkout for cold chain!)
   {
     id: 'surgeles',
-    name: 'Congélateur (Surgelés)',
+    name: 'Congélateur (Surgelés & Glaces)',
     shortLabel: 'Surgelés (Congélo)',
     category: 'Produits Frais',
+    emoji: '❄️',
+    accent: '#06b6d4',
     x: 443,
     y: 104,
     width: 92,
@@ -446,6 +493,8 @@ export const STORE_AISLES: StoreAisle[] = [
     name: 'Caisses & Sortie',
     shortLabel: 'Caisses',
     category: 'Autre',
+    emoji: '💳',
+    accent: '#ec4899',
     x: 285,
     y: 970,
     width: 224,
@@ -458,13 +507,81 @@ export const STORE_AISLES: StoreAisle[] = [
   },
 ];
 
+const LOCAL_STORAGE_LEARNED_KEY = 'agora_learned_aisles_v1';
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 /**
- * Intelligent mapping of an item to its store aisle based on name and category.
+ * Loads learned mappings from localStorage.
+ */
+export function getLocalLearnings(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_LEARNED_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Persists an item keyword -> aisleId mapping permanently.
+ * Synchronizes with localStorage and calls the backend API.
+ */
+export async function learnItemAisle(itemName: string, aisleId: string): Promise<void> {
+  const cleanName = itemName.toLowerCase().trim();
+  if (!cleanName || !aisleId) return;
+
+  // 1. Instant local storage persistence
+  try {
+    const current = getLocalLearnings();
+    current[cleanName] = aisleId;
+    localStorage.setItem(LOCAL_STORAGE_LEARNED_KEY, JSON.stringify(current));
+    // Dispatch local event for reactive updates across the app
+    window.dispatchEvent(new CustomEvent('agora:aisle_learned', { detail: { keyword: cleanName, aisleId } }));
+  } catch (err) {
+    console.error('Failed to save to localStorage', err);
+  }
+
+  // 2. Persist to backend SQLite so Hermes agent also learns
+  try {
+    await fetch(`${API_BASE}/api/learn-aisle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: cleanName, aisle_id: aisleId }),
+    });
+  } catch (err) {
+    // Non-blocking if offline
+    console.warn('Backend sync failed, saved locally', err);
+  }
+}
+
+/**
+ * Intelligent mapping of an item to its store aisle based on name, manual override, learned mappings, and keywords.
  */
 export function detectAisleForItem(item: Item): StoreAisle {
+  // 1. Direct explicit aisle_id on the item
+  if (item.aisle_id) {
+    const direct = STORE_AISLES.find((a) => a.id === item.aisle_id);
+    if (direct) return direct;
+  }
+
   const nameLower = item.name.toLowerCase().trim();
 
-  // 1. Priority check for frozen items to preserve cold chain (e.g., "glace vanille", "pizza surgelée")
+  // 2. Check dynamic learned mappings (self-improving system)
+  const learnings = getLocalLearnings();
+  if (learnings[nameLower]) {
+    const learnedAisle = STORE_AISLES.find((a) => a.id === learnings[nameLower]);
+    if (learnedAisle) return learnedAisle;
+  }
+  // Check substring matches in learned keywords
+  for (const [kw, aisleId] of Object.entries(learnings)) {
+    if (nameLower.includes(kw)) {
+      const learnedAisle = STORE_AISLES.find((a) => a.id === aisleId);
+      if (learnedAisle) return learnedAisle;
+    }
+  }
+
+  // 3. Priority check for frozen items to preserve cold chain (e.g., "glace vanille", "pizza surgelée")
   const frozenAisle = STORE_AISLES.find((a) => a.id === 'surgeles');
   if (frozenAisle) {
     for (const kw of frozenAisle.keywords) {
@@ -474,7 +591,7 @@ export function detectAisleForItem(item: Item): StoreAisle {
     }
   }
 
-  // 2. Direct keyword match across store aisles
+  // 4. Direct keyword match across store aisles
   for (const aisle of STORE_AISLES) {
     if (aisle.id === 'caisses' || aisle.id === 'surgeles') continue;
     for (const kw of aisle.keywords) {
@@ -484,7 +601,7 @@ export function detectAisleForItem(item: Item): StoreAisle {
     }
   }
 
-  // 2. Fallback to broad category match
+  // 5. Fallback to broad category match
   const cat = item.category || '';
   if (cat === 'Fruits & Légumes') {
     return STORE_AISLES.find((a) => a.id === 'fruits-legumes')!;
@@ -548,4 +665,3 @@ export function computeOptimizedRoute(items: Item[]): OptimizedRouteStep[] {
     };
   });
 }
-

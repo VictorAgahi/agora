@@ -31,6 +31,9 @@ func SetupRouter(deps RouterDependencies) http.Handler {
 	mux.HandleFunc("PATCH /api/items/{id}", deps.API.HandleUpdateItem)
 	mux.HandleFunc("DELETE /api/items/{id}", deps.API.HandleDeleteItem)
 	mux.HandleFunc("POST /api/items/clear-completed", deps.API.HandleClearCompleted)
+	mux.HandleFunc("GET /api/aisle-learnings", deps.API.HandleGetAisleLearnings)
+	mux.HandleFunc("GET /api/aisle-corrections", deps.API.HandleGetAisleCorrections)
+	mux.HandleFunc("POST /api/learn-aisle", deps.API.HandleSaveAisleLearning)
 
 	// Frontend Live Updates via SSE
 	mux.Handle("GET /api/stream", deps.Hub)

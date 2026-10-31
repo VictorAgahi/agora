@@ -3,6 +3,7 @@ export interface Item {
   name: string;
   quantity?: string;
   category?: string;
+  aisle_id?: string;
   notes?: string;
   completed: boolean;
   created_at: string;

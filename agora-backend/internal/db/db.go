@@ -54,6 +54,7 @@ func (d *DB) migrate() error {
 		name TEXT NOT NULL,
 		quantity TEXT DEFAULT '',
 		category TEXT DEFAULT 'Autre',
+		aisle_id TEXT DEFAULT '',
 		notes TEXT DEFAULT '',
 		completed INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -62,13 +63,35 @@ func (d *DB) migrate() error {
 
 	CREATE INDEX IF NOT EXISTS idx_items_completed ON items(completed);
 	CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
+
+	CREATE TABLE IF NOT EXISTS aisle_learnings (
+		keyword TEXT PRIMARY KEY,
+		aisle_id TEXT NOT NULL,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS aisle_corrections (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		item_name TEXT NOT NULL,
+		previous_aisle TEXT DEFAULT '',
+		corrected_aisle TEXT NOT NULL,
+		corrected_by TEXT DEFAULT 'user',
+		reason TEXT DEFAULT '',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_corrections_created ON aisle_corrections(created_at DESC);
 	`
-	_, err := d.conn.Exec(schema)
-	return err
+	if _, err := d.conn.Exec(schema); err != nil {
+		return err
+	}
+
+	// Idempotent column addition for existing databases
+	_, _ = d.conn.Exec("ALTER TABLE items ADD COLUMN aisle_id TEXT DEFAULT ''")
+	return nil
 }
 
 func (d *DB) ListItems(includeCompleted bool) ([]models.Item, error) {
-	query := "SELECT id, name, quantity, category, notes, completed, created_at, updated_at FROM items"
+	query := "SELECT id, name, quantity, category, aisle_id, notes, completed, created_at, updated_at FROM items"
 	if !includeCompleted {
 		query += " WHERE completed = 0"
 	}
@@ -91,6 +114,7 @@ func (d *DB) ListItems(includeCompleted bool) ([]models.Item, error) {
 			&item.Name,
 			&item.Quantity,
 			&item.Category,
+			&item.AisleID,
 			&item.Notes,
 			&compInt,
 			&createdAtStr,
@@ -114,7 +138,7 @@ func (d *DB) ListItems(includeCompleted bool) ([]models.Item, error) {
 }
 
 func (d *DB) GetItem(id int64) (*models.Item, error) {
-	query := "SELECT id, name, quantity, category, notes, completed, created_at, updated_at FROM items WHERE id = ?"
+	query := "SELECT id, name, quantity, category, aisle_id, notes, completed, created_at, updated_at FROM items WHERE id = ?"
 	row := d.conn.QueryRow(query, id)
 
 	var item models.Item
@@ -126,6 +150,7 @@ func (d *DB) GetItem(id int64) (*models.Item, error) {
 		&item.Name,
 		&item.Quantity,
 		&item.Category,
+		&item.AisleID,
 		&item.Notes,
 		&compInt,
 		&createdAtStr,
@@ -150,11 +175,13 @@ func (d *DB) AddItem(input models.ItemInput) (*models.Item, error) {
 		category = DetectCategory(input.Name)
 	}
 
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	query := `INSERT INTO items (name, quantity, category, notes, completed, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, 0, ?, ?)`
+	aisleID := strings.TrimSpace(input.AisleID)
 
-	res, err := d.conn.Exec(query, strings.TrimSpace(input.Name), strings.TrimSpace(input.Quantity), category, strings.TrimSpace(input.Notes), now, now)
+	now := time.Now().UTC().Format("2006-01-02 15:04:05")
+	query := `INSERT INTO items (name, quantity, category, aisle_id, notes, completed, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+
+	res, err := d.conn.Exec(query, strings.TrimSpace(input.Name), strings.TrimSpace(input.Quantity), category, aisleID, strings.TrimSpace(input.Notes), now, now)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +275,10 @@ func (d *DB) UpdateItem(id int64, input models.UpdateItemInput) (*models.Item, e
 	if input.Category != nil {
 		category = strings.TrimSpace(*input.Category)
 	}
+	aisleID := existing.AisleID
+	if input.AisleID != nil {
+		aisleID = strings.TrimSpace(*input.AisleID)
+	}
 	notes := existing.Notes
 	if input.Notes != nil {
 		notes = strings.TrimSpace(*input.Notes)
@@ -264,14 +295,45 @@ func (d *DB) UpdateItem(id int64, input models.UpdateItemInput) (*models.Item, e
 
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
 	query := `UPDATE items 
-	          SET name = ?, quantity = ?, category = ?, notes = ?, completed = ?, updated_at = ?
+	          SET name = ?, quantity = ?, category = ?, aisle_id = ?, notes = ?, completed = ?, updated_at = ?
 	          WHERE id = ?`
-	_, err = d.conn.Exec(query, name, quantity, category, notes, compInt, now, id)
+	_, err = d.conn.Exec(query, name, quantity, category, aisleID, notes, compInt, now, id)
 	if err != nil {
 		return nil, err
 	}
 
 	return d.GetItem(id)
+}
+
+func (d *DB) SaveAisleLearning(keyword, aisleID string) error {
+	k := strings.ToLower(strings.TrimSpace(keyword))
+	a := strings.TrimSpace(aisleID)
+	if k == "" || a == "" {
+		return nil
+	}
+
+	query := `INSERT INTO aisle_learnings (keyword, aisle_id, updated_at)
+	          VALUES (?, ?, CURRENT_TIMESTAMP)
+	          ON CONFLICT(keyword) DO UPDATE SET aisle_id = excluded.aisle_id, updated_at = CURRENT_TIMESTAMP`
+	_, err := d.conn.Exec(query, k, a)
+	return err
+}
+
+func (d *DB) GetAisleLearnings() (map[string]string, error) {
+	rows, err := d.conn.Query("SELECT keyword, aisle_id FROM aisle_learnings")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string]string)
+	for rows.Next() {
+		var k, a string
+		if err := rows.Scan(&k, &a); err == nil {
+			res[k] = a
+		}
+	}
+	return res, nil
 }
 
 func (d *DB) DeleteItem(id int64) error {
@@ -285,6 +347,63 @@ func (d *DB) ClearCompleted() (int64, error) {
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+func (d *DB) RecordAisleCorrection(itemName, prevAisle, correctedAisle, correctedBy, reason string) error {
+	name := strings.TrimSpace(itemName)
+	corrected := strings.TrimSpace(correctedAisle)
+	if name == "" || corrected == "" {
+		return nil
+	}
+
+	by := strings.TrimSpace(correctedBy)
+	if by == "" {
+		by = "user"
+	}
+
+	// 1. Insert in audit history
+	query := `INSERT INTO aisle_corrections (item_name, previous_aisle, corrected_aisle, corrected_by, reason, created_at)
+	          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+	_, err := d.conn.Exec(query, name, prevAisle, corrected, by, reason)
+	if err != nil {
+		return err
+	}
+
+	// 2. Persist learning permanently in aisle_learnings table
+	return d.SaveAisleLearning(name, corrected)
+}
+
+func (d *DB) GetAisleCorrections(limit int) ([]models.AisleCorrection, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+
+	query := `SELECT id, item_name, previous_aisle, corrected_aisle, corrected_by, reason, created_at
+	          FROM aisle_corrections
+	          ORDER BY created_at DESC
+	          LIMIT ?`
+
+	rows, err := d.conn.Query(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.AisleCorrection
+	for rows.Next() {
+		var c models.AisleCorrection
+		var createdStr string
+		if err := rows.Scan(&c.ID, &c.ItemName, &c.PreviousAisle, &c.CorrectedAisle, &c.CorrectedBy, &c.Reason, &createdStr); err != nil {
+			return nil, err
+		}
+		c.CreatedAt = parseTime(createdStr)
+		list = append(list, c)
+	}
+
+	if list == nil {
+		list = []models.AisleCorrection{}
+	}
+	return list, nil
 }
 
 func parseTime(raw string) time.Time {

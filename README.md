@@ -64,6 +64,8 @@ L'API expose un serveur MCP conforme au standard Model Context Protocol sur :
 | `mark_as_bought` | Marque un ou plusieurs articles comme achetés via leurs IDs | `ids: [number]` |
 | `clear_completed` | Supprime tous les articles déjà achetés de la liste | `{}` |
 | `get_optimized_shopping_route` | Calcule le parcours de courses optimisé étape par étape dans le magasin (Entrée -> Fruits -> Boulangerie -> Épicerie -> Frais -> Surgelés en dernier -> Caisses) | `include_completed?: boolean` |
+| `get_aisle_corrections_log` | Récupère l'historique d'audit des corrections de rayon effectuées par Victor ou Hermes pour analyser les décalages de disposition | `limit?: number` (défaut: 30) |
+| `learn_aisle_placement` | Enregistre et pérennise un nouvel emplacement produit -> rayon dans la mémoire permanente SQLite d'Agora pour auto-amélioration continue | `item_name: string, aisle_id: string, previous_aisle?: string, reason?: string` |
 
 ---
 
@@ -78,6 +80,9 @@ L'API expose un serveur MCP conforme au standard Model Context Protocol sur :
 | `PATCH` | `/api/items/{id}` | Mise à jour partielle d'un article |
 | `DELETE` | `/api/items/{id}` | Supprime un article |
 | `POST` | `/api/items/clear-completed` | Supprime les articles cochés |
+| `GET` | `/api/aisle-learnings` | Dictionnaire complet des apprentissages de rayons actifs |
+| `GET` | `/api/aisle-corrections` | Historique des corrections de rayon (`?limit=30`) |
+| `POST` | `/api/learn-aisle` | Apprend/corrige l'emplacement d'un article `{ item_name, aisle_id, previous_aisle?, source?, reason? }` |
 | `GET` | `/api/stream` | Flux SSE pour les notifications de mise à jour en direct |
 
 ---

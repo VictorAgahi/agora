@@ -200,6 +200,15 @@ var StoreAisles = []AisleInfo{
 }
 
 func DetectAisleForItem(item models.Item) AisleInfo {
+	// 0. Explicit AisleID override if set on the item
+	if item.AisleID != "" {
+		for _, a := range StoreAisles {
+			if a.ID == item.AisleID {
+				return a
+			}
+		}
+	}
+
 	nameLower := strings.ToLower(item.Name)
 
 	// 1. Frozen / Surgelés priority check (e.g., "glace vanille", "pizza surgelée")

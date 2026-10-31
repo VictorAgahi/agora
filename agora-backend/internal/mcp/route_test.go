@@ -60,3 +60,19 @@ func TestBuildOptimizedRoute_OrderAndColdChain(t *testing.T) {
 		t.Errorf("expected formatted text to include item names")
 	}
 }
+
+func TestBuildOptimizedRoute_ExplicitAisleIDOverride(t *testing.T) {
+	// An item that by default would match "epicerie-conserves" but has been learned / assigned to "creme-liquide"
+	testItems := []models.Item{
+		{ID: 10, Name: "Sauce Béchamel Maison", Category: "Épicerie", AisleID: "creme-liquide"},
+	}
+
+	route := mcp.BuildOptimizedRoute(testItems)
+	if route.TotalSteps != 1 {
+		t.Fatalf("expected 1 step, got %d", route.TotalSteps)
+	}
+	if route.Steps[0].Aisle.ID != "creme-liquide" {
+		t.Errorf("expected aisle to be 'creme-liquide', got '%s'", route.Steps[0].Aisle.ID)
+	}
+}
+

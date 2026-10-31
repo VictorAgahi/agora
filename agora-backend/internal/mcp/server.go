@@ -31,6 +31,17 @@ type GetOptimizedRouteArgs struct {
 	IncludeCompleted bool `json:"include_completed,omitempty" jsonschema:"description=Whether to include already bought/completed items in the route steps (default false, pending items only)"`
 }
 
+type GetAisleCorrectionsLogArgs struct {
+	Limit int `json:"limit,omitempty" jsonschema:"description=Maximum number of recent aisle corrections to retrieve (default 30, max 100)"`
+}
+
+type LearnAislePlacementArgs struct {
+	ItemName      string `json:"item_name" jsonschema:"required,description=The item or product keyword to learn (e.g., 'crème fraîche liquide', 'pain de mie', 'haricots verts')"`
+	AisleID       string `json:"aisle_id" jsonschema:"required,description=The target supermarket aisle ID (e.g., 'creme-liquide', 'pain-sec', 'surgeles', 'fruits-legumes', 'epicerie-conserves')"`
+	PreviousAisle string `json:"previous_aisle,omitempty" jsonschema:"description=The previous or default aisle ID before correction"`
+	Reason        string `json:"reason,omitempty" jsonschema:"description=Explanation of why this aisle is the correct one (e.g., 'Noticed during post-shopping review that liquid cream is near bechamel at top of central aisle')"`
+}
+
 type Server struct {
 	database  *db.DB
 	hub       *api.SSEHub
@@ -118,6 +129,24 @@ func (s *Server) registerTools() {
 			mcp.WithInputSchema[GetOptimizedRouteArgs](),
 		),
 		s.handleGetOptimizedRoute,
+	)
+
+	// Tool 6: get_aisle_corrections_log
+	s.mcpServer.AddTool(
+		mcp.NewTool("get_aisle_corrections_log",
+			mcp.WithDescription("Retrieve recent store aisle corrections made by users or Hermes. Use this after a shopping trip to see which items were relocated or had unexpected locations, allowing Hermes to learn and avoid repeating aisle mistakes."),
+			mcp.WithInputSchema[GetAisleCorrectionsLogArgs](),
+		),
+		s.handleGetAisleCorrectionsLog,
+	)
+
+	// Tool 7: learn_aisle_placement
+	s.mcpServer.AddTool(
+		mcp.NewTool("learn_aisle_placement",
+			mcp.WithDescription("Teach and persist a new item-to-aisle placement rule in Agora's memory. Hermes uses this to self-improve after shopping trips so that future shopping lists place the item in the right aisle automatically."),
+			mcp.WithInputSchema[LearnAislePlacementArgs](),
+		),
+		s.handleLearnAislePlacement,
 	)
 }
 
@@ -262,4 +291,77 @@ func (s *Server) handleGetOptimizedRoute(ctx context.Context, req mcp.CallToolRe
 
 	route := BuildOptimizedRoute(items)
 	return mcp.NewToolResultText(route.ToFormattedText()), nil
+}
+
+func (s *Server) handleGetAisleCorrectionsLog(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var args GetAisleCorrectionsLogArgs
+	if err := req.BindArguments(&args); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments: %v", err)), nil
+	}
+
+	limit := args.Limit
+	if limit <= 0 {
+		limit = 30
+	}
+
+	corrections, err := s.database.GetAisleCorrections(limit)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to get aisle corrections: %v", err)), nil
+	}
+
+	if len(corrections) == 0 {
+		return mcp.NewToolResultText("No aisle corrections recorded yet. All items are currently placed using default heuristics."), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Agora Store Aisle Corrections History (%d entries):\n\n", len(corrections)))
+	for _, c := range corrections {
+		reason := ""
+		if c.Reason != "" {
+			reason = fmt.Sprintf(" (Reason: %s)", c.Reason)
+		}
+		sb.WriteString(fmt.Sprintf("- [%s] '%s': '%s' -> '%s' (by %s)%s\n",
+			c.CreatedAt.Format("2006-01-02 15:04"),
+			c.ItemName,
+			c.PreviousAisle,
+			c.CorrectedAisle,
+			c.CorrectedBy,
+			reason,
+		))
+	}
+
+	jsonBytes, _ := json.MarshalIndent(corrections, "", "  ")
+	sb.WriteString("\nJSON:\n")
+	sb.WriteString(string(jsonBytes))
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+func (s *Server) handleLearnAislePlacement(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var args LearnAislePlacementArgs
+	if err := req.BindArguments(&args); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments: %v", err)), nil
+	}
+
+	itemName := strings.TrimSpace(args.ItemName)
+	aisleID := strings.TrimSpace(args.AisleID)
+	if itemName == "" || aisleID == "" {
+		return mcp.NewToolResultError("item_name and aisle_id cannot be empty"), nil
+	}
+
+	err := s.database.RecordAisleCorrection(itemName, args.PreviousAisle, aisleID, "hermes", args.Reason)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to record learning: %v", err)), nil
+	}
+
+	// Broadcast learning to frontend so live maps and caches update immediately
+	s.hub.Broadcast("aisle_learned", map[string]any{
+		"item_name":       itemName,
+		"previous_aisle":  args.PreviousAisle,
+		"corrected_aisle": aisleID,
+		"source":          "hermes",
+		"reason":          args.Reason,
+	})
+
+	return mcp.NewToolResultText(fmt.Sprintf("Successfully learned placement: '%s' is now permanently mapped to aisle '%s'. Agora store route generator will place it here for all future shopping lists.", itemName, aisleID)), nil
 }

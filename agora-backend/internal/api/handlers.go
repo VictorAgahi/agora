@@ -142,6 +142,90 @@ func (a *API) HandleClearCompleted(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "cleared_count": count})
 }
 
+type AisleLearningInput struct {
+	Keyword        string `json:"keyword"`
+	ItemName       string `json:"item_name,omitempty"`
+	AisleID        string `json:"aisle_id"`
+	PreviousAisle  string `json:"previous_aisle,omitempty"`
+	CorrectedAisle string `json:"corrected_aisle,omitempty"`
+	Source         string `json:"source,omitempty"` // "user" or "hermes"
+	Reason         string `json:"reason,omitempty"`
+}
+
+func (a *API) HandleSaveAisleLearning(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+	var input AisleLearningInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json payload")
+		return
+	}
+
+	name := input.ItemName
+	if name == "" {
+		name = input.Keyword
+	}
+	targetAisle := input.CorrectedAisle
+	if targetAisle == "" {
+		targetAisle = input.AisleID
+	}
+
+	if name == "" || targetAisle == "" {
+		writeError(w, http.StatusBadRequest, "item_name (or keyword) and aisle_id are required")
+		return
+	}
+
+	source := input.Source
+	if source == "" {
+		source = "user"
+	}
+
+	if err := a.database.RecordAisleCorrection(name, input.PreviousAisle, targetAisle, source, input.Reason); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to record aisle correction")
+		return
+	}
+
+	a.hub.Broadcast("aisle_learned", map[string]any{
+		"item_name":       name,
+		"previous_aisle":  input.PreviousAisle,
+		"corrected_aisle": targetAisle,
+		"source":          source,
+		"reason":          input.Reason,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":         true,
+		"item_name":       name,
+		"corrected_aisle": targetAisle,
+		"source":          source,
+	})
+}
+
+func (a *API) HandleGetAisleLearnings(w http.ResponseWriter, r *http.Request) {
+	learnings, err := a.database.GetAisleLearnings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch aisle learnings")
+		return
+	}
+	writeJSON(w, http.StatusOK, learnings)
+}
+
+func (a *API) HandleGetAisleCorrections(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.URL.Query().Get("limit")
+	limit := 30
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	corrections, err := a.database.GetAisleCorrections(limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch aisle corrections")
+		return
+	}
+	writeJSON(w, http.StatusOK, corrections)
+}
+
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
