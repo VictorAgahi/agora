@@ -1,0 +1,23 @@
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Go
+agora-backend/agora-backend
+agora-backend/*.db*
+*.db
+*.db-wal
+*.db-shm
+
+# Node / Frontend
+node_modules/
+agora-frontend/node_modules/
+agora-frontend/dist/
+agora-frontend/.vite/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo

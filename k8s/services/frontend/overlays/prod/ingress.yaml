@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agora-frontend
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: agora-prod-security-headers@kubernetescrd
+    cert-manager.io/cluster-issuer: cloudflare-issuer
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - agora.cyrus-ag.com
+      secretName: agora-front-tls
+  rules:
+    - host: agora.cyrus-ag.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agora-frontend
+                port:
+                  number: 80

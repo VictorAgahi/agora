@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: agora-services
+  namespace: argocd
+spec:
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - env: prod
+                  namespace: agora-prod
+          - list:
+              elements:
+                - service: backend
+                - service: frontend
+  template:
+    metadata:
+      name: "agora-{{service}}-{{env}}"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/VictorAgahi/agora.git
+        targetRevision: main
+        path: "k8s/services/{{service}}/overlays/{{env}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

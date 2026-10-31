@@ -1,0 +1,114 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'agora-frontend/**'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'agora-frontend/**'
+      - '.github/workflows/frontend.yml'
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    name: Lint & Build Frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: agora-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: agora-frontend
+        run: npm ci
+
+      - name: Build Vite SPA
+        working-directory: agora-frontend
+        env:
+          VITE_API_URL: https://api-agora.cyrus-ag.com
+        run: npm run build
+
+  build-docker:
+    needs: lint-and-build
+    runs-on: ubuntu-latest
+    name: Build & Push Docker Image
+    concurrency:
+      group: frontend-deploy
+      cancel-in-progress: false
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase repository owner
+        id: prepare
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./agora-frontend
+          file: ./agora-frontend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.prepare.outputs.owner }}/agora-frontend:latest
+            ghcr.io/${{ steps.prepare.outputs.owner }}/agora-frontend:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=https://api-agora.cyrus-ag.com
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update Kubernetes deployment image tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch --unshallow origin main || git fetch origin main
+          FILE=k8s/services/frontend/base/deployment.yaml
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git checkout -B main origin/main
+            CURRENT=$(grep -m1 -oE 'agora-frontend:[0-9a-f]{40}' "$FILE" | cut -d: -f2 || true)
+            if [ -n "$CURRENT" ] && [ "$CURRENT" != "${{ github.sha }}" ] && git merge-base --is-ancestor "${{ github.sha }}" "$CURRENT" 2>/dev/null; then
+              echo "A newer image ($CURRENT) is already deployed, skipping."
+              exit 0
+            fi
+            sed -i -E 's|(image:\s*ghcr\.io/[a-zA-Z0-9_-]+/agora-frontend):.*|\1:'"${{ github.sha }}"'|g' "$FILE"
+            git add "$FILE"
+            if git diff --cached --quiet; then
+              echo "No changes to commit"
+              exit 0
+            fi
+            git commit -m "chore(deploy): update frontend image tag to ${{ github.sha }} [skip ci]"
+            if git push origin main; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt), retrying on the new main"
+            sleep 5
+          done
+          exit 1
