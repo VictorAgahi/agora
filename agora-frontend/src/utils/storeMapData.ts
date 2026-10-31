@@ -464,9 +464,19 @@ export const STORE_AISLES: StoreAisle[] = [
 export function detectAisleForItem(item: Item): StoreAisle {
   const nameLower = item.name.toLowerCase().trim();
 
-  // 1. Direct keyword match (most specific to least specific)
+  // 1. Priority check for frozen items to preserve cold chain (e.g., "glace vanille", "pizza surgelée")
+  const frozenAisle = STORE_AISLES.find((a) => a.id === 'surgeles');
+  if (frozenAisle) {
+    for (const kw of frozenAisle.keywords) {
+      if (nameLower.includes(kw)) {
+        return frozenAisle;
+      }
+    }
+  }
+
+  // 2. Direct keyword match across store aisles
   for (const aisle of STORE_AISLES) {
-    if (aisle.id === 'caisses') continue;
+    if (aisle.id === 'caisses' || aisle.id === 'surgeles') continue;
     for (const kw of aisle.keywords) {
       if (nameLower.includes(kw)) {
         return aisle;
@@ -538,3 +548,4 @@ export function computeOptimizedRoute(items: Item[]): OptimizedRouteStep[] {
     };
   });
 }
+

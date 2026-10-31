@@ -63,6 +63,7 @@ L'API expose un serveur MCP conforme au standard Model Context Protocol sur :
 | `get_shopping_list` | Récupère la liste actuelle (filtrable par pending, completed, all) | `status?: "pending" \| "completed" \| "all"` |
 | `mark_as_bought` | Marque un ou plusieurs articles comme achetés via leurs IDs | `ids: [number]` |
 | `clear_completed` | Supprime tous les articles déjà achetés de la liste | `{}` |
+| `get_optimized_shopping_route` | Calcule le parcours de courses optimisé étape par étape dans le magasin (Entrée -> Fruits -> Boulangerie -> Épicerie -> Frais -> Surgelés en dernier -> Caisses) | `include_completed?: boolean` |
 
 ---
 

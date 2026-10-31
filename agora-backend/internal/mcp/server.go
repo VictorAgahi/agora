@@ -27,6 +27,10 @@ type MarkBoughtArgs struct {
 
 type ClearCompletedArgs struct{}
 
+type GetOptimizedRouteArgs struct {
+	IncludeCompleted bool `json:"include_completed,omitempty" jsonschema:"description=Whether to include already bought/completed items in the route steps (default false, pending items only)"`
+}
+
 type Server struct {
 	database  *db.DB
 	hub       *api.SSEHub
@@ -105,6 +109,15 @@ func (s *Server) registerTools() {
 			mcp.WithInputSchema[ClearCompletedArgs](),
 		),
 		s.handleClearCompleted,
+	)
+
+	// Tool 5: get_optimized_shopping_route
+	s.mcpServer.AddTool(
+		mcp.NewTool("get_optimized_shopping_route",
+			mcp.WithDescription("Get the step-by-step optimal shopping route through the physical supermarket from entrance to checkouts. Automatically groups items by aisle in order (Fruits & Légumes -> Boulangerie -> Épicerie -> Frais -> Surgelés en dernier -> Caisses), minimizing walking distance and preserving the cold chain."),
+			mcp.WithInputSchema[GetOptimizedRouteArgs](),
+		),
+		s.handleGetOptimizedRoute,
 	)
 }
 
@@ -224,4 +237,29 @@ func (s *Server) handleClearCompleted(ctx context.Context, req mcp.CallToolReque
 	s.hub.Broadcast("items_cleared", map[string]int64{"cleared_count": affected})
 
 	return mcp.NewToolResultText(fmt.Sprintf("Cleared %d completed item(s).", affected)), nil
+}
+
+func (s *Server) handleGetOptimizedRoute(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var args GetOptimizedRouteArgs
+	if err := req.BindArguments(&args); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid arguments: %v", err)), nil
+	}
+
+	items, err := s.database.ListItems(args.IncludeCompleted)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to fetch items: %v", err)), nil
+	}
+
+	if !args.IncludeCompleted {
+		var pending []models.Item
+		for _, it := range items {
+			if !it.Completed {
+				pending = append(pending, it)
+			}
+		}
+		items = pending
+	}
+
+	route := BuildOptimizedRoute(items)
+	return mcp.NewToolResultText(route.ToFormattedText()), nil
 }
