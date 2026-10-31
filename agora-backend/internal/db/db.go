@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/victoragahi/agora/agora-backend/internal/models"
 	_ "modernc.org/sqlite"
@@ -63,6 +64,23 @@ func (d *DB) migrate() error {
 
 	CREATE INDEX IF NOT EXISTS idx_items_completed ON items(completed);
 	CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
+
+	CREATE TABLE IF NOT EXISTS aisle_learnings (
+		keyword TEXT PRIMARY KEY,
+		aisle_id TEXT NOT NULL,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS aisle_corrections (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		item_name TEXT NOT NULL,
+		previous_aisle TEXT DEFAULT '',
+		corrected_aisle TEXT NOT NULL,
+		corrected_by TEXT DEFAULT 'user',
+		reason TEXT DEFAULT '',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_corrections_created ON aisle_corrections(created_at DESC);
 
 	CREATE TABLE IF NOT EXISTS aisle_learnings (
 		keyword TEXT PRIMARY KEY,
@@ -421,23 +439,47 @@ func parseTime(raw string) time.Time {
 func DetectCategory(name string) string {
 	n := strings.ToLower(name)
 	switch {
-	case containsAny(n, "pomme", "poire", "banane", "tomate", "avocat", "salade", "oignon", "ail", "carotte", "courgette", "poivron", "citron", "fruit", "légume", "champignon", "patate", "pomme de terre"):
-		return "Fruits & Légumes"
-	case containsAny(n, "lait", "beurre", "creme", "crème", "yaourt", "fromage", "oeuf", "œuf", "emmental", "mozzarella", "parmesan"):
-		return "Produits Frais"
-	case containsAny(n, "poulet", "boeuf", "bœuf", "porc", "steak", "saumon", "thon", "poisson", "jambon", "viande", "bacon", "saucisse"):
+	case containsWordAny(n, "viande", "viandes", "poulet", "boeuf", "bœuf", "porc", "steak", "steaks", "veau", "agneau", "saumon", "thon", "poisson", "jambon", "bacon", "saucisse", "boucherie", "canard", "dinde", "escalope", "haché", "hache", "entrecote", "bavette"):
 		return "Boucherie & Poisson"
-	case containsAny(n, "pain", "baguette", "croissant", "brioche", "pain de mie", "toast"):
+	case containsWordAny(n, "pomme", "poire", "banane", "tomate", "avocat", "salade", "oignon", "ail", "carotte", "courgette", "poivron", "citron", "fruit", "fruits", "legume", "légume", "legumes", "légumes", "champignon", "patate", "pomme de terre", "fraise", "orange"):
+		return "Fruits & Légumes"
+	case containsWordAny(n, "lait", "beurre", "creme", "crème", "yaourt", "yaourts", "fromage", "fromages", "oeuf", "oeufs", "œuf", "œufs", "emmental", "mozzarella", "parmesan", "camembert", "comté"):
+		return "Produits Frais"
+	case containsWordAny(n, "pain", "baguette", "baguettes", "croissant", "croissants", "brioche", "pain de mie", "toast", "biscottes"):
 		return "Boulangerie"
-	case containsAny(n, "pâte", "pates", "riz", "farine", "sucre", "huile", "vinaigre", "sel", "poivre", "sauce", "chocolat", "biscuit", "cafe", "café", "the", "thé", "confiture", "cereale", "céréale"):
+	case containsWordAny(n, "pâte", "pâtes", "pates", "riz", "farine", "sucre", "huile", "vinaigre", "sel", "poivre", "sauce", "chocolat", "biscuit", "biscuits", "cafe", "café", "the", "thé", "confiture", "cereale", "céréale", "céréales"):
 		return "Épicerie"
-	case containsAny(n, "eau", "jus", "biere", "bière", "vin", "coca", "soda", "limonade", "sirop"):
+	case containsWordAny(n, "eau", "jus", "biere", "bière", "vin", "coca", "soda", "limonade", "sirop"):
 		return "Boissons"
-	case containsAny(n, "savon", "shampoing", "dentifrice", "papier toilette", "sopalin", "lessive", "eponge", "éponge", "sac poubelle"):
+	case containsWordAny(n, "savon", "shampoing", "dentifrice", "papier toilette", "sopalin", "lessive", "eponge", "éponge", "sac poubelle"):
 		return "Maison & Hygiène"
 	default:
 		return "Autre"
 	}
+}
+
+func matchWord(text, kw string) bool {
+	if strings.Contains(kw, " ") {
+		return strings.Contains(text, kw)
+	}
+	words := strings.FieldsFunc(text, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+	for _, w := range words {
+		if w == kw {
+			return true
+		}
+	}
+	return false
+}
+
+func containsWordAny(s string, keywords ...string) bool {
+	for _, k := range keywords {
+		if matchWord(s, k) {
+			return true
+		}
+	}
+	return false
 }
 
 func containsAny(s string, keywords ...string) bool {

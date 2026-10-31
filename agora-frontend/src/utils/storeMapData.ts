@@ -1,5 +1,27 @@
 import { Item } from '../types';
 
+export type AisleColorType =
+  | 'emerald'
+  | 'green'
+  | 'pink'
+  | 'yellow'
+  | 'amber'
+  | 'blue'
+  | 'orange'
+  | 'cyan'
+  | 'red'
+  | 'purple';
+
+export type StoreZone =
+  | 'primeur'
+  | 'boulangerie'
+  | 'frais'
+  | 'boucherie'
+  | 'surgeles'
+  | 'epicerie'
+  | 'hygiene'
+  | 'caisses';
+
 export interface StoreAisle {
   id: string;
   name: string;
@@ -7,6 +29,7 @@ export interface StoreAisle {
   category: string;
   emoji: string;
   accent: string;
+  zone?: StoreZone;
   // SVG bounding box coordinates (viewBox 0 0 1000 1024)
   x: number;
   y: number;
@@ -17,7 +40,7 @@ export interface StoreAisle {
   waypoint: { x: number; y: number };
   // Optimal order in store traversal (1 to 999)
   rank: number;
-  colorType: 'green' | 'pink' | 'yellow' | 'blue' | 'orange' | 'cyan';
+  colorType: AisleColorType;
   keywords: string[];
 }
 
@@ -30,6 +53,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Promotions',
     emoji: '🏷️',
     accent: '#f97316',
+    zone: 'primeur',
     x: 293,
     y: 931,
     width: 141,
@@ -47,6 +71,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Fruits & Légumes',
     emoji: '🍎',
     accent: '#10b981',
+    zone: 'primeur',
     x: 285,
     y: 796,
     width: 148,
@@ -54,7 +79,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 16,
     waypoint: { x: 359, y: 840 },
     rank: 10,
-    colorType: 'green',
+    colorType: 'emerald',
     keywords: [
       'pomme', 'poire', 'banane', 'tomate', 'avocat', 'salade', 'oignon', 'ail',
       'carotte', 'courgette', 'poivron', 'citron', 'fruit', 'légume', 'legume',
@@ -72,6 +97,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Fruits & Légumes',
     emoji: '🥜',
     accent: '#eab308',
+    zone: 'primeur',
     x: 285,
     y: 735,
     width: 113,
@@ -79,7 +105,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 8,
     waypoint: { x: 341, y: 746 },
     rank: 15,
-    colorType: 'yellow',
+    colorType: 'amber',
     keywords: [
       'cajou', 'amande', 'pistache', 'noisette', 'noix', 'fruit sec', 'raisin sec',
       'cacahuete', 'cacahuète', 'arachide', 'graines', 'graines de courge', 'baies'
@@ -92,6 +118,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Boulangerie',
     emoji: '🥖',
     accent: '#f59e0b',
+    zone: 'boulangerie',
     x: 456,
     y: 816,
     width: 114,
@@ -99,7 +126,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 16,
     waypoint: { x: 513, y: 860 },
     rank: 20,
-    colorType: 'yellow',
+    colorType: 'amber',
     keywords: [
       'baguette', 'pain artisanal', 'croissant', 'pain au chocolat', 'chocolatine',
       'brioche', 'chausson', 'flan', 'tourte', 'boule de pain', 'ficelle'
@@ -113,7 +140,8 @@ export const STORE_AISLES: StoreAisle[] = [
     shortLabel: 'Apéro & Chips',
     category: 'Boissons',
     emoji: '🍿',
-    accent: '#3b82f6',
+    accent: '#f97316',
+    zone: 'epicerie',
     x: 654,
     y: 666,
     width: 303,
@@ -121,7 +149,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 790, y: 681 },
     rank: 30,
-    colorType: 'green',
+    colorType: 'orange',
     keywords: [
       'chips', 'pringles', 'apéro', 'apero', 'doritos', 'bretzel', 'tortillas',
       'crakers', 'biere', 'bière', 'vin', 'coca', 'soda', 'fanta', 'sprite',
@@ -135,6 +163,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Épicerie',
     emoji: '🌮',
     accent: '#ef4444',
+    zone: 'epicerie',
     x: 657,
     y: 613,
     width: 293,
@@ -142,7 +171,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 790, y: 628 },
     rank: 40,
-    colorType: 'green',
+    colorType: 'red',
     keywords: [
       'mexicain', 'asiatique', 'tacos', 'fajitas', 'sauce soja', 'nouilles',
       'ramen', 'curry', 'lait de coco', 'wasabi', 'nem', 'sushi', 'sauce piquante',
@@ -156,6 +185,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Épicerie',
     emoji: '🍝',
     accent: '#10b981',
+    zone: 'epicerie',
     x: 654,
     y: 556,
     width: 304,
@@ -163,7 +193,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 790, y: 571 },
     rank: 50,
-    colorType: 'green',
+    colorType: 'emerald',
     keywords: [
       'pate', 'pâtes', 'pates', 'spaghetti', 'coquillettes', 'penne', 'tagliatelles',
       'sauce tomate', 'pesto', 'bolognaise', 'sauce', 'conserve', 'thon', 'mais',
@@ -178,6 +208,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Épicerie',
     emoji: '🌾',
     accent: '#f59e0b',
+    zone: 'epicerie',
     x: 653,
     y: 465,
     width: 285,
@@ -185,7 +216,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 790, y: 482 },
     rank: 60,
-    colorType: 'green',
+    colorType: 'amber',
     keywords: [
       'farine', 'sucre', 'levure', 'huile', 'vinaigre', 'sel', 'poivre', 'epice',
       'épice', 'chocolat noir', 'chocolat patissier', 'vanille', 'arome',
@@ -199,6 +230,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Épicerie',
     emoji: '🥚',
     accent: '#84cc16',
+    zone: 'epicerie',
     x: 646,
     y: 352,
     width: 304,
@@ -220,6 +252,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Boulangerie',
     emoji: '🍞',
     accent: '#d97706',
+    zone: 'boulangerie',
     x: 648,
     y: 272,
     width: 303,
@@ -227,7 +260,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 790, y: 288 },
     rank: 80,
-    colorType: 'green',
+    colorType: 'amber',
     keywords: [
       'pain de mie', 'biscottes', 'cracotte', 'toast', 'muffin', 'pain burger',
       'pain hot dog', 'wasa', 'swedish'
@@ -240,6 +273,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Épicerie',
     emoji: '☕',
     accent: '#78350f',
+    zone: 'epicerie',
     x: 648,
     y: 171,
     width: 304,
@@ -247,7 +281,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 790, y: 186 },
     rank: 90,
-    colorType: 'green',
+    colorType: 'amber',
     keywords: [
       'cereale', 'céréales', 'muesli', 'granola', 'cafe', 'café', 'the', 'thé',
       'infusion', 'capsules', 'confiture', 'miel', 'pate a tartiner', 'nutella',
@@ -260,7 +294,8 @@ export const STORE_AISLES: StoreAisle[] = [
     shortLabel: 'Hygiène & Entretien',
     category: 'Maison & Hygiène',
     emoji: '🧼',
-    accent: '#06b6d4',
+    accent: '#8b5cf6',
+    zone: 'hygiene',
     x: 645,
     y: 21,
     width: 304,
@@ -268,7 +303,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 16,
     waypoint: { x: 790, y: 67 },
     rank: 100,
-    colorType: 'green',
+    colorType: 'purple',
     keywords: [
       'papier toilette', 'dentifrice', 'vaisselle', 'sopalin', 'essuie-tout',
       'lessive', 'liquide vaisselle', 'shampoing', 'savon', 'gel douche',
@@ -285,6 +320,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Produits Frais',
     emoji: '🧀',
     accent: '#eab308',
+    zone: 'frais',
     x: 50,
     y: 359,
     width: 326,
@@ -292,7 +328,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 213, y: 381 },
     rank: 110,
-    colorType: 'green',
+    colorType: 'yellow',
     keywords: [
       'fromage', 'camembert', 'comte', 'comté', 'chevre', 'chèvre', 'emmental',
       'parmesan', 'mozzarella', 'roquefort', 'brie', 'feta', 'gouda', 'cantal',
@@ -305,7 +341,8 @@ export const STORE_AISLES: StoreAisle[] = [
     shortLabel: 'Crème liquide',
     category: 'Produits Frais',
     emoji: '🥛',
-    accent: '#93c5fd',
+    accent: '#38bdf8',
+    zone: 'frais',
     x: 500,
     y: 340,
     width: 66,
@@ -313,7 +350,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 8,
     waypoint: { x: 533, y: 366 },
     rank: 120,
-    colorType: 'green',
+    colorType: 'blue',
     keywords: ['creme liquide', 'crème liquide', 'bechamel', 'béchamel', 'fleurette', 'creme fleurette'],
   },
   {
@@ -323,6 +360,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Produits Frais',
     emoji: '🥟',
     accent: '#facc15',
+    zone: 'frais',
     x: 541,
     y: 442,
     width: 39,
@@ -330,7 +368,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 560, y: 507 },
     rank: 130,
-    colorType: 'green',
+    colorType: 'yellow',
     keywords: [
       'pates fraiches', 'pâtes fraîches', 'tagliatelles fraiches', 'ravioli frais',
       'gnocchi', 'pate brisee', 'pâte brisée', 'pate feuilletee', 'pâte feuilletée',
@@ -344,6 +382,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Boucherie & Poisson',
     emoji: '🥩',
     accent: '#f43f5e',
+    zone: 'boucherie',
     x: 479,
     y: 458,
     width: 38,
@@ -351,8 +390,13 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 498, y: 513 },
     rank: 140,
-    colorType: 'green',
-    keywords: ['boeuf', 'bœuf', 'steak', 'hache', 'haché', 'veau', 'porc', 'agneau', 'cote de boeuf', 'bavette', 'faux-filet'],
+    colorType: 'red',
+    keywords: [
+      'viande', 'viandes', 'viande rouge', 'viande hachee', 'viande hachée',
+      'boeuf', 'bœuf', 'steak', 'steaks', 'hache', 'haché', 'veau', 'porc',
+      'agneau', 'cote de boeuf', 'côte de boeuf', 'bavette', 'faux-filet',
+      'entrecote', 'entrecôte', 'bourguignon', 'roti', 'rôti', 'carpaccio', 'tartare'
+    ],
   },
   {
     id: 'volailles',
@@ -361,6 +405,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Boucherie & Poisson',
     emoji: '🍗',
     accent: '#fb923c',
+    zone: 'boucherie',
     x: 387,
     y: 457,
     width: 38,
@@ -368,8 +413,11 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 406, y: 540 },
     rank: 150,
-    colorType: 'green',
-    keywords: ['poulet', 'dinde', 'canard', 'filet de poulet', 'cuisse de poulet', 'escalope', 'blanc de poulet', 'aiguillette'],
+    colorType: 'orange',
+    keywords: [
+      'volaille', 'volailles', 'poulet', 'dinde', 'canard', 'filet de poulet',
+      'cuisse de poulet', 'escalope', 'blanc de poulet', 'aiguillette', 'magret'
+    ],
   },
   {
     id: 'creme-solide',
@@ -377,7 +425,8 @@ export const STORE_AISLES: StoreAisle[] = [
     shortLabel: 'Crème épaisse',
     category: 'Produits Frais',
     emoji: '🥣',
-    accent: '#bae6fd',
+    accent: '#38bdf8',
+    zone: 'frais',
     x: 353,
     y: 459,
     width: 31,
@@ -385,7 +434,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 368, y: 547 },
     rank: 160,
-    colorType: 'green',
+    colorType: 'blue',
     keywords: ['creme fraiche', 'crème fraîche', 'creme epaisse', 'crème épaisse', 'creme pot', 'creme solide'],
   },
   {
@@ -394,7 +443,8 @@ export const STORE_AISLES: StoreAisle[] = [
     shortLabel: 'Sandwichs',
     category: 'Produits Frais',
     emoji: '🥪',
-    accent: '#a3e635',
+    accent: '#10b981',
+    zone: 'frais',
     x: 477,
     y: 573,
     width: 40,
@@ -412,6 +462,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Boucherie & Poisson',
     emoji: '🥓',
     accent: '#fb7185',
+    zone: 'boucherie',
     x: 541,
     y: 576,
     width: 40,
@@ -419,7 +470,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 12,
     waypoint: { x: 561, y: 640 },
     rank: 180,
-    colorType: 'green',
+    colorType: 'pink',
     keywords: ['jambon', 'lardon', 'lardons', 'bacon', 'saucisse', 'knacki', 'des de jambon', 'jambon blanc'],
   },
   {
@@ -428,7 +479,8 @@ export const STORE_AISLES: StoreAisle[] = [
     shortLabel: 'Charcuterie / Traiteur',
     category: 'Produits Frais',
     emoji: '🍤',
-    accent: '#f472b6',
+    accent: '#f43f5e',
+    zone: 'boucherie',
     x: 128,
     y: 483,
     width: 170,
@@ -436,7 +488,7 @@ export const STORE_AISLES: StoreAisle[] = [
     rx: 16,
     waypoint: { x: 213, y: 556 },
     rank: 190,
-    colorType: 'green',
+    colorType: 'pink',
     keywords: [
       'traiteur', 'plat cuisine', 'quiche', 'saucisson', 'jambon sec', 'pate croute',
       'rillettes', 'terrine', 'saumon fume', 'saumon', 'truite', 'poisson', 'crevettes'
@@ -449,6 +501,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Produits Frais',
     emoji: '🍓',
     accent: '#ec4899',
+    zone: 'frais',
     x: 23,
     y: 476,
     width: 247,
@@ -472,6 +525,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Produits Frais',
     emoji: '❄️',
     accent: '#06b6d4',
+    zone: 'surgeles',
     x: 443,
     y: 104,
     width: 92,
@@ -495,6 +549,7 @@ export const STORE_AISLES: StoreAisle[] = [
     category: 'Autre',
     emoji: '💳',
     accent: '#ec4899',
+    zone: 'caisses',
     x: 285,
     y: 970,
     width: 224,
@@ -556,6 +611,20 @@ export async function learnItemAisle(itemName: string, aisleId: string): Promise
 }
 
 /**
+ * Word-boundary keyword matcher so short keywords like "oeuf" don't match inside "boeuf",
+ * "ail" inside "volaille", or "eau" inside "poireau".
+ */
+export function matchKeyword(text: string, kw: string): boolean {
+  const t = text.toLowerCase();
+  const k = kw.toLowerCase();
+  if (k.includes(' ')) {
+    return t.includes(k);
+  }
+  const regex = new RegExp(`(^|[^a-z0-9à-ÿ])${k}([^a-z0-9à-ÿ]|$)`, 'i');
+  return regex.test(t);
+}
+
+/**
  * Intelligent mapping of an item to its store aisle based on name, manual override, learned mappings, and keywords.
  */
 export function detectAisleForItem(item: Item): StoreAisle {
@@ -573,9 +642,9 @@ export function detectAisleForItem(item: Item): StoreAisle {
     const learnedAisle = STORE_AISLES.find((a) => a.id === learnings[nameLower]);
     if (learnedAisle) return learnedAisle;
   }
-  // Check substring matches in learned keywords
+  // Check word matches in learned keywords
   for (const [kw, aisleId] of Object.entries(learnings)) {
-    if (nameLower.includes(kw)) {
+    if (matchKeyword(nameLower, kw)) {
       const learnedAisle = STORE_AISLES.find((a) => a.id === aisleId);
       if (learnedAisle) return learnedAisle;
     }
@@ -585,17 +654,17 @@ export function detectAisleForItem(item: Item): StoreAisle {
   const frozenAisle = STORE_AISLES.find((a) => a.id === 'surgeles');
   if (frozenAisle) {
     for (const kw of frozenAisle.keywords) {
-      if (nameLower.includes(kw)) {
+      if (matchKeyword(nameLower, kw)) {
         return frozenAisle;
       }
     }
   }
 
-  // 4. Direct keyword match across store aisles
+  // 4. Direct keyword match across store aisles with word boundary
   for (const aisle of STORE_AISLES) {
     if (aisle.id === 'caisses' || aisle.id === 'surgeles') continue;
     for (const kw of aisle.keywords) {
-      if (nameLower.includes(kw)) {
+      if (matchKeyword(nameLower, kw)) {
         return aisle;
       }
     }

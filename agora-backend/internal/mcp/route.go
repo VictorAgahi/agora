@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/victoragahi/agora/agora-backend/internal/models"
 )
@@ -143,14 +144,22 @@ var StoreAisles = []AisleInfo{
 		Name:     "Viandes rouges & Boucherie",
 		Location: "Allée centrale (gauche haut)",
 		Rank:     140,
-		Keywords: []string{"boeuf", "bœuf", "steak", "hache", "haché", "veau", "porc", "agneau", "bavette"},
+		Keywords: []string{
+			"viande", "viandes", "viande rouge", "viande hachee", "viande hachée",
+			"boeuf", "bœuf", "steak", "steaks", "hache", "haché", "veau", "porc",
+			"agneau", "cote de boeuf", "côte de boeuf", "bavette", "faux-filet",
+			"entrecote", "entrecôte", "bourguignon", "roti", "rôti", "carpaccio", "tartare",
+		},
 	},
 	{
 		ID:       "volailles",
 		Name:     "Volailles (Poulet, Dinde)",
 		Location: "Allée centrale (gauche milieu)",
 		Rank:     150,
-		Keywords: []string{"poulet", "dinde", "canard", "escalope", "blanc de poulet", "cuisse de poulet"},
+		Keywords: []string{
+			"volaille", "volailles", "poulet", "dinde", "canard", "escalope",
+			"blanc de poulet", "cuisse de poulet", "filet de poulet", "aiguillette", "magret",
+		},
 	},
 	{
 		ID:       "creme-solide",
@@ -214,7 +223,7 @@ func DetectAisleForItem(item models.Item) AisleInfo {
 	// 1. Frozen / Surgelés priority check (e.g., "glace vanille", "pizza surgelée")
 	frozenAisle := getAisleByID("surgeles")
 	for _, kw := range frozenAisle.Keywords {
-		if strings.Contains(nameLower, kw) {
+		if matchKeyword(nameLower, kw) {
 			return frozenAisle
 		}
 	}
@@ -225,7 +234,7 @@ func DetectAisleForItem(item models.Item) AisleInfo {
 			continue
 		}
 		for _, kw := range a.Keywords {
-			if strings.Contains(nameLower, kw) {
+			if matchKeyword(nameLower, kw) {
 				return a
 			}
 		}
@@ -258,6 +267,21 @@ func getAisleByID(id string) AisleInfo {
 		}
 	}
 	return StoreAisles[6] // epicerie-conserves
+}
+
+func matchKeyword(text, kw string) bool {
+	if strings.Contains(kw, " ") {
+		return strings.Contains(text, kw)
+	}
+	words := strings.FieldsFunc(text, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+	for _, w := range words {
+		if w == kw {
+			return true
+		}
+	}
+	return false
 }
 
 type RouteStep struct {

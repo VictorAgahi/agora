@@ -11,6 +11,13 @@ import {
   X,
   Compass,
   MoveRight,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Crosshair,
+  Eye,
+  EyeOff,
+  Search,
 } from 'lucide-react';
 import { Item } from '../types';
 import {
@@ -32,7 +39,13 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
   const [selectedAisleId, setSelectedAisleId] = useState<string | null>(null);
   const [reassigningItem, setReassigningItem] = useState<Item | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'guided' | 'all'>('guided');
+  const [searchQuery, setSearchQuery] = useState('');
   const [, setForceRender] = useState(0);
+
+  // Zoom & ViewBox State (0 0 1000 1024 base)
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [focusCenter, setFocusCenter] = useState<{ x: number; y: number }>({ x: 500, y: 512 });
 
   // Listen to learned aisle updates to re-render in real time
   useEffect(() => {
@@ -102,6 +115,51 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
   const completedSteps = routeSteps.filter((s) => s.allCompleted).length;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
+  // Compute responsive dynamic SVG ViewBox
+  const computedViewBox = useMemo(() => {
+    const baseW = 1000;
+    const baseH = 1024;
+    const w = baseW / zoomLevel;
+    const h = baseH / zoomLevel;
+
+    // Center around focusCenter and clamp within store boundary
+    const x = Math.max(0, Math.min(baseW - w, focusCenter.x - w / 2));
+    const y = Math.max(0, Math.min(baseH - h, focusCenter.y - h / 2));
+
+    return `${x} ${y} ${w} ${h}`;
+  }, [zoomLevel, focusCenter]);
+
+  // Center on current step
+  const handleCenterOnStep = (step: OptimizedRouteStep | null) => {
+    if (!step) return;
+    triggerHaptic(20);
+    setFocusCenter(step.aisle.waypoint);
+    setZoomLevel(1.5);
+    setSelectedAisleId(step.aisle.id);
+  };
+
+  // Reset to full view
+  const handleResetView = () => {
+    triggerHaptic(15);
+    setZoomLevel(1);
+    setFocusCenter({ x: 500, y: 512 });
+  };
+
+  // Zoom helpers
+  const handleZoomIn = () => {
+    triggerHaptic(15);
+    setZoomLevel((z) => Math.min(2.4, +(z + 0.35).toFixed(2)));
+  };
+
+  const handleZoomOut = () => {
+    triggerHaptic(15);
+    setZoomLevel((z) => {
+      const next = Math.max(1, +(z - 0.35).toFixed(2));
+      if (next === 1) setFocusCenter({ x: 500, y: 512 });
+      return next;
+    });
+  };
+
   // Handle reassigning an item to another aisle (Self-improving AI learning)
   const handleSelectNewAisle = async (targetAisle: StoreAisle) => {
     if (!reassigningItem) return;
@@ -121,6 +179,24 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
     }, 4500);
   };
 
+  // Filtered aisles based on search
+  const searchedAisleIds = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase().trim();
+    const matches = new Set<string>();
+    for (const a of STORE_AISLES) {
+      if (
+        a.name.toLowerCase().includes(q) ||
+        a.shortLabel.toLowerCase().includes(q) ||
+        a.category.toLowerCase().includes(q) ||
+        a.keywords.some((k) => k.includes(q))
+      ) {
+        matches.add(a.id);
+      }
+    }
+    return matches;
+  }, [searchQuery]);
+
   return (
     <div className="space-y-4 select-none">
       {/* Toast notification for learned changes */}
@@ -136,13 +212,13 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
 
       {/* Route Navigation Top Card */}
       {totalSteps > 0 ? (
-        <div className="bg-gradient-to-r from-emerald-950/40 via-zinc-900/80 to-zinc-900/50 border border-emerald-900/40 rounded-3xl p-4 shadow-xl">
+        <div className="bg-gradient-to-r from-emerald-950/50 via-zinc-900/90 to-zinc-900/60 border border-emerald-800/40 rounded-3xl p-4 shadow-xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-inner">
                 <Navigation className="w-5 h-5 animate-pulse" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
                     Parcours Optimisé
@@ -171,12 +247,10 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                onClick={() => {
-                  if (currentStep) setSelectedAisleId(currentStep.aisle.id);
-                }}
+                onClick={() => handleCenterOnStep(currentStep)}
                 className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 shadow-md shadow-emerald-700/30 active:scale-95 transition"
               >
-                <span>Voir</span>
+                <span>Localiser</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -200,70 +274,244 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
         </div>
       )}
 
-      {/* Interactive 2D Supermarket Canvas (1000x1024) */}
-      <div className="relative bg-zinc-950 border border-zinc-800/80 rounded-3xl overflow-hidden shadow-2xl p-2 sm:p-3">
-        <div className="flex items-center justify-between px-2 py-1 text-[11px] text-zinc-400">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="font-semibold text-zinc-300">Plan Supermarché 2D</span>
+      {/* Interactive 2D Supermarket Canvas & Professional Retail Controls */}
+      <div className="relative bg-zinc-950 border border-zinc-800/80 rounded-3xl overflow-hidden shadow-2xl">
+        {/* Modern Map Header & Controls Toolbar */}
+        <div className="p-3 bg-zinc-900/80 border-b border-zinc-800/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-2.5">
+          {/* Left: Department & Title */}
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-zinc-100">Plan Supermarché 2D</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+                  Échelle 1:1
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-400">
+                {zoomLevel > 1 ? `Zoom ${Math.round(zoomLevel * 100)}%` : 'Vue d’ensemble'}
+              </p>
+            </div>
           </div>
-          <span className="text-[10px] text-zinc-500 flex items-center gap-1">
-            <span>💡 Touchez un rayon pour inspecter</span>
-          </span>
+
+          {/* Center: Search input */}
+          <div className="relative flex-1 min-w-[140px] max-w-xs">
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Chercher un rayon / produit..."
+              className="w-full pl-8 pr-7 py-1 text-xs bg-zinc-950/70 border border-zinc-800 rounded-xl text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/50"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Right: View Mode & Zoom Actions */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* View Mode Toggle: Guided vs All */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(15);
+                setViewMode((m) => (m === 'guided' ? 'all' : 'guided'));
+              }}
+              title={viewMode === 'guided' ? 'Afficher tous les rayons' : 'Afficher seulement mes rayons'}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition ${
+                viewMode === 'guided'
+                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                  : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300 hover:text-white'
+              }`}
+            >
+              {viewMode === 'guided' ? (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Mes rayons</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+                  <span className="hidden sm:inline">Tous</span>
+                </>
+              )}
+            </button>
+
+            {/* Recenter on Cart */}
+            <button
+              type="button"
+              onClick={() => handleCenterOnStep(currentStep)}
+              title="Centrer sur mon panier"
+              className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-300 hover:text-emerald-400 transition"
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Zoom Out */}
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              disabled={zoomLevel <= 1}
+              title="Dézoomer"
+              className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 disabled:opacity-30 border border-zinc-700/60 text-zinc-300 transition"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Zoom In */}
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              disabled={zoomLevel >= 2.4}
+              title="Zoomer"
+              className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 disabled:opacity-30 border border-zinc-700/60 text-zinc-300 transition"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Reset view */}
+            {zoomLevel > 1 && (
+              <button
+                type="button"
+                onClick={handleResetView}
+                title="Réinitialiser la vue"
+                className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-300 transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="relative w-full aspect-[1000/1024] max-h-[70vh] flex items-center justify-center">
+        {/* 2D Canvas Container with Smooth Transition */}
+        <div className="relative w-full aspect-[1000/1024] max-h-[72vh] flex items-center justify-center bg-[#070a12] overflow-hidden">
           <svg
-            viewBox="0 0 1000 1024"
-            className="w-full h-full drop-shadow-md"
+            viewBox={computedViewBox}
+            className="w-full h-full transition-[viewBox] duration-500 ease-out drop-shadow-2xl select-none"
             preserveAspectRatio="xMidYMid meet"
           >
             <defs>
-              {/* Floor Pattern */}
-              <pattern id="floorTile" width="40" height="40" patternUnits="userSpaceOnUse">
-                <rect width="40" height="40" fill="#09090b" />
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#18181b" strokeWidth="1" />
+              {/* Floor Terrazzo Fine Grid Pattern */}
+              <pattern id="storeTileGrid" width="30" height="30" patternUnits="userSpaceOnUse">
+                <rect width="30" height="30" fill="#090d16" />
+                <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#131c2e" strokeWidth="0.8" />
               </pattern>
 
-              {/* Shelf Color Gradients */}
-              <linearGradient id="aisleGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#34d399" />
-                <stop offset="100%" stop-color="#059669" />
+              {/* Department Ambient Lighting Glows */}
+              <radialGradient id="glowPrimeur" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+              </radialGradient>
+
+              <radialGradient id="glowBoulangerie" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+              </radialGradient>
+
+              <radialGradient id="glowBoucherie" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
+              </radialGradient>
+
+              <radialGradient id="glowSurgeles" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
+              </radialGradient>
+
+              <radialGradient id="glowFrais" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#ec4899" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#ec4899" stopOpacity="0" />
+              </radialGradient>
+
+              <radialGradient id="glowEpicerie" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.12" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+              </radialGradient>
+
+              {/* Realistic 2.5D Department Shelf Color Gradients */}
+              <linearGradient id="shelfEmerald" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="35%" stopColor="#059669" />
+                <stop offset="100%" stopColor="#064e3b" />
               </linearGradient>
 
-              <linearGradient id="aisleWood" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#fde047" />
-                <stop offset="100%" stop-color="#ca8a04" />
+              <linearGradient id="shelfAmber" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="35%" stopColor="#d97706" />
+                <stop offset="100%" stopColor="#78350f" />
               </linearGradient>
 
-              <linearGradient id="aislePink" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#f472b6" />
-                <stop offset="100%" stop-color="#db2777" />
+              <linearGradient id="shelfRed" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#fb7185" />
+                <stop offset="35%" stopColor="#e11d48" />
+                <stop offset="100%" stopColor="#881337" />
               </linearGradient>
 
-              <linearGradient id="aisleFreezer" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#67e8f9" />
-                <stop offset="100%" stop-color="#0284c7" />
+              <linearGradient id="shelfPink" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#f472b6" />
+                <stop offset="35%" stopColor="#db2777" />
+                <stop offset="100%" stopColor="#831843" />
               </linearGradient>
 
-              <linearGradient id="aisleBlue" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#60a5fa" />
-                <stop offset="100%" stop-color="#2563eb" />
+              <linearGradient id="shelfCyan" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#67e8f9" />
+                <stop offset="35%" stopColor="#0891b2" />
+                <stop offset="100%" stopColor="#164e63" />
               </linearGradient>
 
-              <linearGradient id="aisleOrange" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#fb923c" />
-                <stop offset="100%" stop-color="#ea580c" />
+              <linearGradient id="shelfBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#93c5fd" />
+                <stop offset="35%" stopColor="#2563eb" />
+                <stop offset="100%" stopColor="#1e3a8a" />
               </linearGradient>
 
-              {/* Shelf Drop Shadows */}
-              <filter id="shelfShadow" x="-5%" y="-5%" width="115%" height="115%">
-                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.5" />
+              <linearGradient id="shelfPurple" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#c084fc" />
+                <stop offset="35%" stopColor="#9333ea" />
+                <stop offset="100%" stopColor="#581c87" />
+              </linearGradient>
+
+              <linearGradient id="shelfOrange" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#fdba74" />
+                <stop offset="35%" stopColor="#ea580c" />
+                <stop offset="100%" stopColor="#7c2d12" />
+              </linearGradient>
+
+              <linearGradient id="shelfYellow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#fef08a" />
+                <stop offset="35%" stopColor="#ca8a04" />
+                <stop offset="100%" stopColor="#713f12" />
+              </linearGradient>
+
+              {/* Wireframe blueprint gradient for non-active aisles in guided mode */}
+              <linearGradient id="shelfMuted" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#1e293b" />
+                <stop offset="100%" stopColor="#0f172a" />
+              </linearGradient>
+
+              {/* Advanced Drop Shadows */}
+              <filter id="shelfShadow" x="-10%" y="-10%" width="120%" height="125%">
+                <feDropShadow dx="0" dy="5" stdDeviation="4" floodColor="#000000" floodOpacity="0.65" />
               </filter>
 
-              {/* Animated Path Glow */}
-              <filter id="pathGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="6" result="blur" />
+              <filter id="cartGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+
+              <filter id="pathNeonGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="7" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
                   <feMergeNode in="SourceGraphic" />
@@ -271,173 +519,240 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
               </filter>
             </defs>
 
-            {/* Background Floor with Subtle Grid */}
-            <rect width="1000" height="1024" fill="url(#floorTile)" rx="24" />
+            {/* 1. Floor Background & Fine Terrazzo Grid */}
+            <rect width="1000" height="1024" fill="url(#storeTileGrid)" rx="24" />
 
-            {/* Architectural Outline Walls */}
-            <g stroke="#27272a" strokeWidth="4" fill="none">
+            {/* 2. Department Ambient Lighting Radiance Underlay */}
+            <circle cx="359" cy="850" r="160" fill="url(#glowPrimeur)" pointerEvents="none" />
+            <circle cx="513" cy="870" r="140" fill="url(#glowBoulangerie)" pointerEvents="none" />
+            <circle cx="489" cy="210" r="160" fill="url(#glowSurgeles)" pointerEvents="none" />
+            <circle cx="450" cy="540" r="180" fill="url(#glowBoucherie)" pointerEvents="none" />
+            <circle cx="160" cy="650" r="220" fill="url(#glowFrais)" pointerEvents="none" />
+            <circle cx="790" cy="450" r="260" fill="url(#glowEpicerie)" pointerEvents="none" />
+
+            {/* 3. Architectural Exterior & Partition Walls */}
+            <g stroke="#334155" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.8">
+              {/* Top and Right exterior boundary */}
               <line x1="292" y1="12" x2="965" y2="12" />
               <line x1="965" y1="12" x2="965" y2="990" />
-              <line x1="10" y1="265" x2="10" y2="760" />
-              <line x1="10" y1="334" x2="380" y2="334" />
+              {/* Left exterior wall & refrigerated perimeter */}
+              <line x1="12" y1="265" x2="12" y2="760" />
+              <line x1="12" y1="334" x2="380" y2="334" />
               <line x1="380" y1="50" x2="380" y2="325" />
               <line x1="560" y1="90" x2="560" y2="334" />
               <line x1="482" y1="765" x2="482" y2="815" />
               <line x1="482" y1="765" x2="965" y2="765" />
             </g>
 
-            {/* Floor Direction Arrows (Sens de circulation) */}
-            <g fill="#27272a" opacity="0.4" className="pointer-events-none">
-              <text x="610" y="680" fontSize="16" fontWeight="bold">↑</text>
-              <text x="610" y="470" fontSize="16" fontWeight="bold">↑</text>
-              <text x="610" y="270" fontSize="16" fontWeight="bold">↑</text>
-              <text x="430" y="380" fontSize="16" fontWeight="bold">←</text>
-              <text x="320" y="680" fontSize="16" fontWeight="bold">↓</text>
-            </g>
-
-            {/* 1. L-Shaped Yaourts Mur Wall Fixtures */}
+            {/* 4. Elegant Illuminated Department Floor Typography */}
             <g
-              id="yaourts-wall"
-              className="cursor-pointer"
-              onClick={() => setSelectedAisleId('yaourts')}
+              fill="#334155"
+              fontSize="12"
+              fontWeight="900"
+              letterSpacing="2.5"
+              textAnchor="middle"
+              className="pointer-events-none select-none opacity-40 font-mono"
             >
-              {/* Vertical Top */}
-              <rect
-                x="23"
-                y="476"
-                width="29"
-                height="237"
-                rx="8"
-                fill="url(#aislePink)"
-                stroke="#18181b"
-                strokeWidth="2"
-                filter="url(#shelfShadow)"
-              />
-              {/* Horizontal Bottom */}
-              <rect
-                x="26"
-                y="719"
-                width="201"
-                height="20"
-                rx="6"
-                fill="url(#aislePink)"
-                stroke="#18181b"
-                strokeWidth="2"
-                filter="url(#shelfShadow)"
-              />
-              {/* Vertical Bottom */}
-              <rect
-                x="230"
-                y="720"
-                width="40"
-                height="241"
-                rx="10"
-                fill="url(#aislePink)"
-                stroke="#18181b"
-                strokeWidth="2"
-                filter="url(#shelfShadow)"
-              />
-
-              {/* Mur yaourts decor & labels */}
-              <text
-                x="37"
-                y="595"
-                fill="#ffffff"
-                fontSize="11"
-                fontWeight="900"
-                textAnchor="middle"
-                transform="rotate(-90, 37, 595)"
-                className="pointer-events-none"
-              >
-                🍓 FRAIS & YAOURTS
-              </text>
-              <text
-                x="126"
-                y="733"
-                fill="#ffffff"
-                fontSize="10"
-                fontWeight="bold"
-                textAnchor="middle"
-                className="pointer-events-none"
-              >
-                🥛 LAIT & CRÈMES DESSERT
-              </text>
-              <text
-                x="250"
-                y="840"
-                fill="#ffffff"
-                fontSize="11"
-                fontWeight="900"
-                textAnchor="middle"
-                transform="rotate(-90, 250, 840)"
-                className="pointer-events-none"
-              >
-                🧈 BEURRE & FRAIS
-              </text>
+              <text x="360" y="785">HALL PRIMEURS</text>
+              <text x="515" y="805">FOURNIL</text>
+              <text x="790" y="725">GRANDES ALLÉES ÉPICERIE</text>
+              <text x="790" y="145">ENTRETIEN & SOIN</text>
+              <text x="490" y="75">PÔLE GRAND FROID</text>
+              <text x="450" y="430">BOUCHERIE & CHARCUTERIE</text>
+              <text x="210" y="465">CRÈMERIE & TRAITEUR</text>
             </g>
 
-            {/* 2. Entrance & Exit Doors with Turnstiles */}
-            <g id="entrance-exit">
-              {/* Entrance Blue Box */}
+            {/* 5. Directional Circulation Floor Arrows */}
+            <g fill="#334155" opacity="0.35" className="pointer-events-none font-bold">
+              <text x="615" y="680" fontSize="18">↑</text>
+              <text x="615" y="470" fontSize="18">↑</text>
+              <text x="615" y="270" fontSize="18">↑</text>
+              <text x="430" y="380" fontSize="18">←</text>
+              <text x="325" y="670" fontSize="18">↓</text>
+            </g>
+
+            {/* 6. Grand Mur L-Shape Frais & Yaourts Fixture */}
+            {(() => {
+              const step = stepByAisleId.get('yaourts');
+              const hasItems = !!step && step.items.length > 0;
+              const isSelected = selectedAisle?.id === 'yaourts';
+              const isDimmed = viewMode === 'guided' && !hasItems;
+              const isSearched = searchedAisleIds ? searchedAisleIds.has('yaourts') : false;
+
+              return (
+                <g
+                  id="yaourts-wall"
+                  className="cursor-pointer transition-all duration-200"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setSelectedAisleId('yaourts');
+                  }}
+                  opacity={isDimmed ? 0.35 : 1}
+                >
+                  {/* Selection Pulsing Glow */}
+                  {(isSelected || isSearched) && (
+                    <g stroke="#10b981" strokeWidth="4" fill="none" className="animate-pulse">
+                      <rect x="18" y="471" width="39" height="247" rx="12" />
+                      <rect x="21" y="714" width="211" height="30" rx="10" />
+                      <rect x="225" y="715" width="50" height="251" rx="14" />
+                    </g>
+                  )}
+
+                  {/* Vertical Top Section */}
+                  <rect
+                    x="23"
+                    y="476"
+                    width="29"
+                    height="237"
+                    rx="8"
+                    fill={isDimmed ? 'url(#shelfMuted)' : 'url(#shelfPink)'}
+                    stroke={isSelected ? '#10b981' : isDimmed ? '#1e293b' : '#db2777'}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    filter="url(#shelfShadow)"
+                  />
+                  {/* Glass Sliding Reflection */}
+                  <line x1="28" y1="485" x2="46" y2="705" stroke="#ffffff" strokeWidth="1" opacity="0.3" pointerEvents="none" />
+
+                  {/* Horizontal Bottom Section */}
+                  <rect
+                    x="26"
+                    y="719"
+                    width="201"
+                    height="20"
+                    rx="6"
+                    fill={isDimmed ? 'url(#shelfMuted)' : 'url(#shelfPink)'}
+                    stroke={isSelected ? '#10b981' : isDimmed ? '#1e293b' : '#db2777'}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    filter="url(#shelfShadow)"
+                  />
+
+                  {/* Vertical Bottom Section */}
+                  <rect
+                    x="230"
+                    y="720"
+                    width="40"
+                    height="241"
+                    rx="10"
+                    fill={isDimmed ? 'url(#shelfMuted)' : 'url(#shelfPink)'}
+                    stroke={isSelected ? '#10b981' : isDimmed ? '#1e293b' : '#db2777'}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    filter="url(#shelfShadow)"
+                  />
+                  <line x1="236" y1="730" x2="264" y2="950" stroke="#ffffff" strokeWidth="1" opacity="0.3" pointerEvents="none" />
+
+                  {/* Wall Fixture Labels */}
+                  <text
+                    x="37"
+                    y="595"
+                    fill="#ffffff"
+                    fontSize="11"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    transform="rotate(-90, 37, 595)"
+                    className="pointer-events-none select-none drop-shadow"
+                  >
+                    🍓 FRAIS & YAOURTS
+                  </text>
+                  <text
+                    x="126"
+                    y="733"
+                    fill="#ffffff"
+                    fontSize="10"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    className="pointer-events-none select-none drop-shadow"
+                  >
+                    🥛 LAIT & CRÈMES DESSERT
+                  </text>
+                  <text
+                    x="250"
+                    y="840"
+                    fill="#ffffff"
+                    fontSize="11"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    transform="rotate(-90, 250, 840)"
+                    className="pointer-events-none select-none drop-shadow"
+                  >
+                    🧈 BEURRE & CRÈMERIE
+                  </text>
+                </g>
+              );
+            })()}
+
+            {/* 7. Entrance, Turnstiles & Checkout Belts */}
+            <g id="entrance-checkout">
+              {/* Entrance Gate */}
               <rect
                 x="286"
                 y="996"
                 width="221"
-                height="25"
+                height="24"
                 rx="8"
-                fill="url(#aisleBlue)"
-                stroke="#1e3a8a"
-                strokeWidth="2"
+                fill="url(#shelfBlue)"
+                stroke="#1d4ed8"
+                strokeWidth="1.5"
+                filter="url(#shelfShadow)"
               />
               <text
                 x="396"
-                y="1013"
+                y="1012"
                 fill="#ffffff"
                 fontSize="11"
-                fontWeight="bold"
+                fontWeight="900"
                 textAnchor="middle"
-                className="pointer-events-none"
+                className="pointer-events-none tracking-wider"
               >
                 🚪 ENTRÉE DU MAGASIN
               </text>
 
-              {/* Caisses Conveyor & Checkout Belts */}
+              {/* Checkout Belt Fixtures */}
               <rect
                 x="285"
                 y="970"
                 width="224"
                 height="22"
                 rx="6"
-                fill="#18181b"
-                stroke="#3f3f46"
-                strokeWidth="2"
+                fill="#0f172a"
+                stroke="#334155"
+                strokeWidth="1.5"
               />
-              {/* Conveyor belt lines */}
-              <line x1="310" y1="970" x2="310" y2="992" stroke="#27272a" strokeWidth="2" />
-              <line x1="360" y1="970" x2="360" y2="992" stroke="#27272a" strokeWidth="2" />
-              <line x1="420" y1="970" x2="420" y2="992" stroke="#27272a" strokeWidth="2" />
-              <line x1="470" y1="970" x2="470" y2="992" stroke="#27272a" strokeWidth="2" />
+              {/* Motorized rollers tick marks */}
+              <line x1="310" y1="970" x2="310" y2="992" stroke="#1e293b" strokeWidth="2" />
+              <line x1="340" y1="970" x2="340" y2="992" stroke="#1e293b" strokeWidth="2" />
+              <line x1="370" y1="970" x2="370" y2="992" stroke="#1e293b" strokeWidth="2" />
+              <line x1="400" y1="970" x2="400" y2="992" stroke="#1e293b" strokeWidth="2" />
+              <line x1="430" y1="970" x2="430" y2="992" stroke="#1e293b" strokeWidth="2" />
+              <line x1="460" y1="970" x2="460" y2="992" stroke="#1e293b" strokeWidth="2" />
+              <line x1="490" y1="970" x2="490" y2="992" stroke="#1e293b" strokeWidth="2" />
+
+              {/* Checkout open lane lights */}
+              <circle cx="295" cy="981" r="3" fill="#22c55e" />
+              <circle cx="355" cy="981" r="3" fill="#22c55e" />
+              <circle cx="415" cy="981" r="3" fill="#22c55e" />
+              <circle cx="475" cy="981" r="3" fill="#22c55e" />
+
               <text
                 x="397"
                 y="985"
                 fill="#f472b6"
                 fontSize="10"
-                fontWeight="bold"
+                fontWeight="900"
                 textAnchor="middle"
-                className="pointer-events-none"
+                className="pointer-events-none drop-shadow"
               >
                 💳 CAISSES & SORTIE
               </text>
 
-              {/* Second Entrée pill */}
+              {/* Portique Entrée 2 */}
               <rect
                 x="513"
                 y="967"
                 width="57"
                 height="24"
                 rx="6"
-                fill="url(#aisleBlue)"
-                stroke="#1e3a8a"
+                fill="url(#shelfBlue)"
+                stroke="#1d4ed8"
                 strokeWidth="1.5"
               />
               <text
@@ -453,29 +768,40 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
               </text>
             </g>
 
-            {/* 3. Render all store aisles / shelves */}
+            {/* 8. Render All Store Aisles & 2.5D Shelves */}
             {STORE_AISLES.filter((a) => a.id !== 'caisses' && a.id !== 'yaourts').map((aisle) => {
               const step = stepByAisleId.get(aisle.id);
               const hasItems = !!step && step.items.length > 0;
               const isAllCompleted = hasItems && step.allCompleted;
               const isSelected = selectedAisle?.id === aisle.id;
               const isCurrent = currentStep?.aisle.id === aisle.id;
+              const isDimmed = viewMode === 'guided' && !hasItems;
+              const isSearched = searchedAisleIds ? searchedAisleIds.has(aisle.id) : false;
 
-              // Color gradient assignment
-              let fillGradient = 'url(#aisleGreen)';
-              if (aisle.colorType === 'yellow') fillGradient = 'url(#aisleWood)';
-              if (aisle.colorType === 'pink') fillGradient = 'url(#aislePink)';
-              if (aisle.colorType === 'cyan') fillGradient = 'url(#aisleFreezer)';
-              if (aisle.colorType === 'orange') fillGradient = 'url(#aisleOrange)';
+              // Assign rich gradient based on aisle colorType
+              let fillGradient = 'url(#shelfEmerald)';
+              if (aisle.colorType === 'amber') fillGradient = 'url(#shelfAmber)';
+              if (aisle.colorType === 'yellow') fillGradient = 'url(#shelfYellow)';
+              if (aisle.colorType === 'red') fillGradient = 'url(#shelfRed)';
+              if (aisle.colorType === 'pink') fillGradient = 'url(#shelfPink)';
+              if (aisle.colorType === 'cyan') fillGradient = 'url(#shelfCyan)';
+              if (aisle.colorType === 'blue') fillGradient = 'url(#shelfBlue)';
+              if (aisle.colorType === 'purple') fillGradient = 'url(#shelfPurple)';
+              if (aisle.colorType === 'orange') fillGradient = 'url(#shelfOrange)';
+              if (isDimmed) fillGradient = 'url(#shelfMuted)';
 
               return (
                 <g
                   key={aisle.id}
-                  onClick={() => setSelectedAisleId(aisle.id)}
-                  className="cursor-pointer transition-transform duration-150 active:scale-[0.985]"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setSelectedAisleId(aisle.id);
+                  }}
+                  className="cursor-pointer transition-all duration-200"
+                  opacity={isDimmed ? 0.35 : 1}
                 >
-                  {/* Selected / Current Pulsing Ring */}
-                  {isSelected && (
+                  {/* Selection / Search / Current Step Pulsing Halo */}
+                  {(isSelected || isSearched) && (
                     <rect
                       x={aisle.x - 6}
                       y={aisle.y - 6}
@@ -489,7 +815,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                     />
                   )}
 
-                  {/* Main Shelf Box */}
+                  {/* Main Shelf Gondola Body */}
                   <rect
                     x={aisle.x}
                     y={aisle.y}
@@ -497,41 +823,110 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                     height={aisle.height}
                     rx={aisle.rx || 10}
                     fill={fillGradient}
-                    stroke={isSelected ? '#10b981' : '#18181b'}
+                    stroke={isSelected ? '#10b981' : isDimmed ? '#1e293b' : aisle.accent}
                     strokeWidth={isSelected ? 2.5 : 1.5}
                     filter="url(#shelfShadow)"
                     className="transition-all duration-200 hover:brightness-110"
                   />
 
-                  {/* Visual Props & Shelf Texture Overlays */}
-                  {aisle.id === 'surgeles' && (
-                    // Frost crystals overlay on freezer
-                    <g opacity="0.6" className="pointer-events-none">
-                      <line x1={aisle.x + 8} y1={aisle.y + 10} x2={aisle.x + aisle.width - 8} y2={aisle.y + 10} stroke="#ffffff" strokeWidth="2" strokeDasharray="6 4" />
-                      <line x1={aisle.x + 8} y1={aisle.y + aisle.height - 10} x2={aisle.x + aisle.width - 8} y2={aisle.y + aisle.height - 10} stroke="#ffffff" strokeWidth="2" strokeDasharray="6 4" />
-                      <text x={aisle.x + aisle.width / 2} y={aisle.y + 35} fontSize="14" textAnchor="middle">❄️</text>
-                      <text x={aisle.x + aisle.width / 2} y={aisle.y + aisle.height - 20} fontSize="14" textAnchor="middle">🍦</text>
+                  {/* Shelf Top Lighting Edge Highlight */}
+                  <line
+                    x1={aisle.x + (aisle.rx || 10)}
+                    y1={aisle.y + 2}
+                    x2={aisle.x + aisle.width - (aisle.rx || 10)}
+                    y2={aisle.y + 2}
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    opacity={isDimmed ? 0.2 : 0.5}
+                    pointerEvents="none"
+                  />
+
+                  {/* Department Specific Themed Overlays */}
+                  {aisle.id === 'surgeles' && !isDimmed && (
+                    // Icy Crystal Frost Reflections on Freezers
+                    <g opacity="0.75" className="pointer-events-none">
+                      <line
+                        x1={aisle.x + 8}
+                        y1={aisle.y + 12}
+                        x2={aisle.x + aisle.width - 8}
+                        y2={aisle.y + 12}
+                        stroke="#e0f2fe"
+                        strokeWidth="2"
+                        strokeDasharray="6 4"
+                      />
+                      <line
+                        x1={aisle.x + 8}
+                        y1={aisle.y + aisle.height - 12}
+                        x2={aisle.x + aisle.width - 8}
+                        y2={aisle.y + aisle.height - 12}
+                        stroke="#e0f2fe"
+                        strokeWidth="2"
+                        strokeDasharray="6 4"
+                      />
+                      {/* Frosted Glass Glare */}
+                      <line
+                        x1={aisle.x + 15}
+                        y1={aisle.y + 20}
+                        x2={aisle.x + aisle.width - 15}
+                        y2={aisle.y + aisle.height - 20}
+                        stroke="#ffffff"
+                        strokeWidth="1"
+                        opacity="0.3"
+                      />
+                      <text x={aisle.x + aisle.width / 2} y={aisle.y + 36} fontSize="14" textAnchor="middle">
+                        ❄️
+                      </text>
+                      <text x={aisle.x + aisle.width / 2} y={aisle.y + aisle.height - 22} fontSize="14" textAnchor="middle">
+                        🍦
+                      </text>
                     </g>
                   )}
 
-                  {aisle.id === 'fruits-legumes' && (
-                    // Crate texture for fruits & vegetables
-                    <g opacity="0.4" className="pointer-events-none">
-                      <rect x={aisle.x + 8} y={aisle.y + 8} width={aisle.width - 16} height={aisle.height - 16} rx="8" fill="none" stroke="#064e3b" strokeWidth="2" strokeDasharray="8 6" />
+                  {aisle.id === 'fruits-legumes' && !isDimmed && (
+                    // Wooden Market Produce Crates
+                    <g opacity="0.5" className="pointer-events-none">
+                      <rect
+                        x={aisle.x + 8}
+                        y={aisle.y + 8}
+                        width={aisle.width - 16}
+                        height={aisle.height - 16}
+                        rx="8"
+                        fill="none"
+                        stroke="#064e3b"
+                        strokeWidth="2"
+                        strokeDasharray="8 6"
+                      />
                       <text x={aisle.x + 22} y={aisle.y + 30} fontSize="14">🍎</text>
                       <text x={aisle.x + aisle.width - 24} y={aisle.y + 30} fontSize="14">🥦</text>
                       <text x={aisle.x + 22} y={aisle.y + aisle.height - 16} fontSize="14">🥕</text>
-                      <text x={aisle.x + aisle.width - 24} y={aisle.y + aisle.height - 16} fontSize="14">🍌</text>
+                      <text x={aisle.x + aisle.width - 24} y={aisle.y + aisle.height - 16} fontSize="14">🥑</text>
                     </g>
                   )}
 
-                  {aisle.id === 'boulangerie-fraiche' && (
-                    // Wood slats for bakery
-                    <g opacity="0.4" className="pointer-events-none">
+                  {aisle.id === 'boulangerie-fraiche' && !isDimmed && (
+                    // Wood Slats Texture for Bakery
+                    <g opacity="0.45" className="pointer-events-none">
                       <line x1={aisle.x + 10} y1={aisle.y + 25} x2={aisle.x + aisle.width - 10} y2={aisle.y + 25} stroke="#78350f" strokeWidth="2" />
                       <line x1={aisle.x + 10} y1={aisle.y + aisle.height - 25} x2={aisle.x + aisle.width - 10} y2={aisle.y + aisle.height - 25} stroke="#78350f" strokeWidth="2" />
                       <text x={aisle.x + 20} y={aisle.y + 28} fontSize="13">🥖</text>
                       <text x={aisle.x + aisle.width - 20} y={aisle.y + 28} fontSize="13">🥐</text>
+                    </g>
+                  )}
+
+                  {aisle.id === 'viandes-rouge' && !isDimmed && (
+                    // Butchery Cutting Texture
+                    <g opacity="0.6" className="pointer-events-none">
+                      <line x1={aisle.x + 6} y1={aisle.y + 18} x2={aisle.x + aisle.width - 6} y2={aisle.y + 18} stroke="#ffffff" strokeWidth="1" strokeDasharray="4 4" />
+                      <text x={aisle.x + aisle.width / 2} y={aisle.y + 30} fontSize="13" textAnchor="middle">🥩</text>
+                    </g>
+                  )}
+
+                  {/* Horizontal Gondola Shelf Divider Marks for Grocery Aisles */}
+                  {aisle.width > 200 && !isDimmed && (
+                    <g stroke="#ffffff" strokeWidth="1" opacity="0.25" pointerEvents="none">
+                      <line x1={aisle.x + aisle.width * 0.33} y1={aisle.y + 3} x2={aisle.x + aisle.width * 0.33} y2={aisle.y + aisle.height - 3} />
+                      <line x1={aisle.x + aisle.width * 0.66} y1={aisle.y + 3} x2={aisle.x + aisle.width * 0.66} y2={aisle.y + aisle.height - 3} />
                     </g>
                   )}
 
@@ -553,7 +948,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                     <g transform={`translate(${aisle.waypoint.x}, ${aisle.waypoint.y})`}>
                       {isAllCompleted ? (
                         <g>
-                          <circle r="14" fill="#10b981" stroke="#09090b" strokeWidth="2.5" />
+                          <circle r="14" fill="#10b981" stroke="#090d16" strokeWidth="2.5" />
                           <path
                             d="M -5 0 L -1 4 L 6 -3"
                             fill="none"
@@ -571,14 +966,14 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                               r="20"
                               fill="none"
                               stroke="#10b981"
-                              strokeWidth="2"
+                              strokeWidth="2.5"
                               opacity="0.8"
                               className="animate-ping"
                             />
                           )}
                           <circle
                             r="15"
-                            fill="#09090b"
+                            fill="#090d16"
                             stroke={isCurrent ? '#34d399' : '#10b981'}
                             strokeWidth="3"
                           />
@@ -592,7 +987,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                           >
                             {step.stepNumber}
                           </text>
-                          {/* Pending items mini badge */}
+                          {/* Pending items count badge */}
                           <g transform="translate(12, -10)">
                             <circle r="8" fill="#ef4444" />
                             <text
@@ -613,37 +1008,49 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
               );
             })}
 
-            {/* 4. Optimized Dynamic Route Path (Animated Dash Flow) */}
+            {/* 9. Animated Glowing Shopper Trajectory & Caddie */}
             {pathD && (
               <g pointerEvents="none">
-                {/* Background Shadow / Glow for path */}
+                {/* Background Neon Glow */}
                 <path
                   d={pathD}
                   fill="none"
                   stroke="#059669"
                   strokeWidth="8"
-                  opacity="0.3"
-                  filter="url(#pathGlow)"
+                  opacity="0.35"
+                  filter="url(#pathNeonGlow)"
                 />
-                {/* Core Dashed Animated Route Line */}
+                {/* Core Animated Dash Line */}
                 <path
                   d={pathD}
                   fill="none"
                   stroke="#34d399"
                   strokeWidth="4"
-                  strokeDasharray="10 8"
+                  strokeDasharray="12 10"
                   strokeLinecap="round"
                   className="animate-route-flow"
                 />
 
-                {/* Animated Shopping Cart Icon (Caddie) at Current Step */}
+                {/* Animated Shopping Cart (Caddie) at Current Active Step */}
                 {currentStep && (
                   <g
-                    transform={`translate(${currentStep.aisle.waypoint.x}, ${currentStep.aisle.waypoint.y - 28})`}
+                    transform={`translate(${currentStep.aisle.waypoint.x}, ${currentStep.aisle.waypoint.y - 30})`}
                     className="animate-bounce"
+                    filter="url(#cartGlow)"
                   >
-                    <rect x="-14" y="-14" width="28" height="28" rx="8" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                    <text x="0" y="5" fontSize="15" textAnchor="middle">🛒</text>
+                    <rect
+                      x="-15"
+                      y="-15"
+                      width="30"
+                      height="30"
+                      rx="10"
+                      fill="#10b981"
+                      stroke="#ffffff"
+                      strokeWidth="2"
+                    />
+                    <text x="0" y="5" fontSize="16" textAnchor="middle">
+                      🛒
+                    </text>
                   </g>
                 )}
               </g>
@@ -657,7 +1064,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-4 sm:p-5 shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-2">
           <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold text-sm shadow-inner">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold text-lg shadow-inner">
                 {selectedAisle.emoji}
               </div>
               <div>
@@ -679,7 +1086,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
 
             <button
               onClick={() => setSelectedAisleId(null)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
               aria-label="Fermer"
             >
               <X className="w-4 h-4" />
@@ -733,7 +1140,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                     <button
                       type="button"
                       onClick={() => setReassigningItem(item)}
-                      title="Mauvais rayon ? Changer l'emplacement pour toujours"
+                      title="Mauvais rayon ? Corriger et mémoriser pour toujours"
                       className="px-2 py-1 rounded-lg bg-zinc-900/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700/50 text-[10px] font-medium flex items-center gap-1 transition active:scale-95"
                     >
                       <MoveRight className="w-3 h-3 text-emerald-400" />
@@ -772,7 +1179,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                   onClick={() => {
                     const currentIndex = routeSteps.findIndex((s) => s.aisle.id === selectedAisle.id);
                     const nextIndex = (currentIndex + 1) % routeSteps.length;
-                    setSelectedAisleId(routeSteps[nextIndex].aisle.id);
+                    handleCenterOnStep(routeSteps[nextIndex]);
                   }}
                   className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1 transition active:scale-95"
                 >

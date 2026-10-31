@@ -76,3 +76,25 @@ func TestBuildOptimizedRoute_ExplicitAisleIDOverride(t *testing.T) {
 	}
 }
 
+func TestDetectAisleForItem_MeatVsBioOeuf(t *testing.T) {
+	testCases := []struct {
+		name          string
+		expectedAisle string
+	}{
+		{"Viande", "viandes-rouge"},
+		{"Viande hachée", "viandes-rouge"},
+		{"Steak de boeuf 15%", "viandes-rouge"},
+		{"Côte de boeuf", "viandes-rouge"},
+		{"Boeuf bourguignon", "viandes-rouge"},
+		{"Boîte de 6 oeufs", "bio-oeufs"},
+		{"Oeufs bio", "bio-oeufs"},
+	}
+
+	for _, tc := range testCases {
+		aisle := mcp.DetectAisleForItem(models.Item{Name: tc.name})
+		if aisle.ID != tc.expectedAisle {
+			t.Errorf("item '%s': expected aisle '%s', got '%s'", tc.name, tc.expectedAisle, aisle.ID)
+		}
+	}
+}
+
