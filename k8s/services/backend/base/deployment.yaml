@@ -24,7 +24,7 @@ spec:
         - name: ghcr-login
       containers:
         - name: backend
-          image: ghcr.io/victoragahi/agora-backend:latest
+          image: ghcr.io/victoragahi/agora-backend:b23ed8d27c0c3f001b9c3b62f9ca4acda7ff3a41
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
