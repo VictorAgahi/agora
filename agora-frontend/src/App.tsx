@@ -24,7 +24,7 @@ export function App() {
   const pendingCount = items.filter((it) => !it.completed).length;
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-950 flex flex-col font-sans pb-[max(3rem,calc(env(safe-area-inset-bottom)+1.5rem))]">
+    <div className="min-h-[100dvh] bg-zinc-950 flex flex-col font-sans pb-[max(3rem,calc(env(safe-area-inset-bottom)+1.5rem))] w-full max-w-full overflow-x-hidden">
       <Header
         connected={connected}
         completedCount={completedCount}
@@ -32,7 +32,7 @@ export function App() {
         onRefresh={refresh}
       />
 
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 pt-4 space-y-4">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-4 space-y-4 min-w-0 overflow-x-hidden">
         {error && (
           <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-red-950/40 border border-red-800/60 text-red-300 text-xs shadow-sm">
             <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />

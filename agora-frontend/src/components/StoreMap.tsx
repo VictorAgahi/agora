@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Check,
   CheckCircle2,
@@ -14,7 +14,6 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Crosshair,
   Eye,
   EyeOff,
   Search,
@@ -40,12 +39,16 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
   const [reassigningItem, setReassigningItem] = useState<Item | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'guided' | 'all'>('guided');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [, setForceRender] = useState(0);
 
-  // Zoom & ViewBox State (0 0 1000 1024 base)
+  // Zoom & ViewBox State (Base: 0 0 1000 1024)
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [focusCenter, setFocusCenter] = useState<{ x: number; y: number }>({ x: 500, y: 512 });
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Listen to learned aisle updates to re-render in real time
   useEffect(() => {
@@ -117,6 +120,9 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
 
   // Compute responsive dynamic SVG ViewBox
   const computedViewBox = useMemo(() => {
+    if (zoomLevel <= 1) {
+      return '0 0 1000 1024';
+    }
     const baseW = 1000;
     const baseH = 1024;
     const w = baseW / zoomLevel;
@@ -129,35 +135,53 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
     return `${x} ${y} ${w} ${h}`;
   }, [zoomLevel, focusCenter]);
 
-  // Center on current step
-  const handleCenterOnStep = (step: OptimizedRouteStep | null) => {
-    if (!step) return;
-    triggerHaptic(20);
-    setFocusCenter(step.aisle.waypoint);
-    setZoomLevel(1.5);
-    setSelectedAisleId(step.aisle.id);
-  };
-
-  // Reset to full view
+  // Reset to 100% full view
   const handleResetView = () => {
     triggerHaptic(15);
     setZoomLevel(1);
     setFocusCenter({ x: 500, y: 512 });
   };
 
-  // Zoom helpers
+  // Zoom In
   const handleZoomIn = () => {
     triggerHaptic(15);
-    setZoomLevel((z) => Math.min(2.4, +(z + 0.35).toFixed(2)));
+    setZoomLevel((z) => Math.min(2.4, +(z + 0.4).toFixed(2)));
   };
 
+  // Zoom Out
   const handleZoomOut = () => {
     triggerHaptic(15);
     setZoomLevel((z) => {
-      const next = Math.max(1, +(z - 0.35).toFixed(2));
+      const next = Math.max(1, +(z - 0.4).toFixed(2));
       if (next === 1) setFocusCenter({ x: 500, y: 512 });
       return next;
     });
+  };
+
+  // Pan dragging handler for zoomed view
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (zoomLevel <= 1) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || zoomLevel <= 1) return;
+    const rect = mapContainerRef.current?.getBoundingClientRect();
+    const widthPx = rect?.width || 360;
+    const scale = (1000 / widthPx) / zoomLevel;
+    const dx = (e.clientX - dragStart.x) * scale;
+    const dy = (e.clientY - dragStart.y) * scale;
+
+    setDragStart({ x: e.clientX, y: e.clientY });
+    setFocusCenter((c) => ({
+      x: Math.max(100, Math.min(900, c.x - dx)),
+      y: Math.max(100, Math.min(924, c.y - dy)),
+    }));
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
   };
 
   // Handle reassigning an item to another aisle (Self-improving AI learning)
@@ -198,7 +222,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
   }, [searchQuery]);
 
   return (
-    <div className="space-y-4 select-none">
+    <div className="space-y-3.5 select-none w-full max-w-full overflow-hidden">
       {/* Toast notification for learned changes */}
       {toastMessage && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[90%] p-3.5 bg-emerald-950/95 border border-emerald-500/50 rounded-2xl shadow-2xl text-emerald-200 text-xs flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4">
@@ -210,45 +234,49 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
         </div>
       )}
 
-      {/* Route Navigation Top Card */}
+      {/* Route Navigation Top Banner Card - 100% Mobile Safe */}
       {totalSteps > 0 ? (
-        <div className="bg-gradient-to-r from-emerald-950/50 via-zinc-900/90 to-zinc-900/60 border border-emerald-800/40 rounded-3xl p-4 shadow-xl">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-inner">
-                <Navigation className="w-5 h-5 animate-pulse" />
+        <div className="bg-gradient-to-r from-emerald-950/50 via-zinc-900/90 to-zinc-900/60 border border-emerald-800/40 rounded-3xl p-3 sm:p-4 shadow-xl min-w-0 overflow-hidden">
+          <div className="flex items-center justify-between gap-2.5 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-inner">
+                <Navigation className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] sm:text-xs font-semibold text-emerald-400 uppercase tracking-wider">
                     Parcours Optimisé
                   </span>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60 font-mono">
-                    {completedSteps}/{totalSteps} étapes
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60 font-mono">
+                    {completedSteps}/{totalSteps}
                   </span>
                 </div>
-                <h3 className="text-sm font-bold text-white mt-0.5 flex items-center gap-1.5 truncate">
+                <h3 className="text-xs sm:text-sm font-bold text-white mt-0.5 truncate">
                   {currentStep && !currentStep.allCompleted ? (
-                    <>
-                      <span>Prochain : </span>
-                      <span className="text-emerald-300 font-extrabold flex items-center gap-1">
-                        <span>{currentStep.aisle.emoji}</span>
-                        <span>{currentStep.aisle.shortLabel}</span>
+                    <span className="flex items-center gap-1 truncate">
+                      <span className="text-zinc-400">Prochain :</span>
+                      <span className="text-emerald-300 font-extrabold truncate">
+                        {currentStep.aisle.emoji} {currentStep.aisle.shortLabel}
                       </span>
-                    </>
+                    </span>
                   ) : (
-                    <span className="text-emerald-300">Tout est dans le panier ! Direction les caisses 🛒</span>
+                    <span className="text-emerald-300 truncate">Direction les caisses 🛒</span>
                   )}
                 </h3>
               </div>
             </div>
 
-            {/* Step selector shortcut */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            {/* Quick step action button */}
+            <div className="shrink-0">
               <button
                 type="button"
-                onClick={() => handleCenterOnStep(currentStep)}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 shadow-md shadow-emerald-700/30 active:scale-95 transition"
+                onClick={() => {
+                  if (currentStep) {
+                    triggerHaptic(20);
+                    setSelectedAisleId(currentStep.aisle.id);
+                  }
+                }}
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 shadow-md shadow-emerald-700/30 active:scale-95 transition"
               >
                 <span>Localiser</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -257,7 +285,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
           </div>
 
           {/* Progress bar */}
-          <div className="w-full bg-zinc-800/80 rounded-full h-1.5 mt-3.5 overflow-hidden">
+          <div className="w-full bg-zinc-800/80 rounded-full h-1.5 mt-3 overflow-hidden">
             <div
               className="bg-emerald-500 h-full rounded-full transition-all duration-500 ease-out shadow-sm shadow-emerald-400/50"
               style={{ width: `${progressPercent}%` }}
@@ -274,50 +302,38 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
         </div>
       )}
 
-      {/* Interactive 2D Supermarket Canvas & Professional Retail Controls */}
-      <div className="relative bg-zinc-950 border border-zinc-800/80 rounded-3xl overflow-hidden shadow-2xl">
-        {/* Modern Map Header & Controls Toolbar */}
-        <div className="p-3 bg-zinc-900/80 border-b border-zinc-800/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-2.5">
-          {/* Left: Department & Title */}
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <MapPin className="w-4 h-4" />
+      {/* Interactive 2D Supermarket Canvas Card */}
+      <div className="relative bg-zinc-950 border border-zinc-800/80 rounded-3xl overflow-hidden shadow-2xl w-full min-w-0">
+        {/* Compact Responsive Header */}
+        <div className="p-2.5 sm:p-3 bg-zinc-900/90 border-b border-zinc-800/80 backdrop-blur-md flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
+              <MapPin className="w-3.5 h-3.5" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-zinc-100">Plan Supermarché 2D</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
-                  Échelle 1:1
-                </span>
-              </div>
-              <p className="text-[10px] text-zinc-400">
-                {zoomLevel > 1 ? `Zoom ${Math.round(zoomLevel * 100)}%` : 'Vue d’ensemble'}
-              </p>
-            </div>
+            <span className="text-xs font-bold text-zinc-100 truncate">Plan Supermarché 2D</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono shrink-0 hidden xs:inline">
+              Vue {zoomLevel > 1 ? `${Math.round(zoomLevel * 100)}%` : 'complète'}
+            </span>
           </div>
 
-          {/* Center: Search input */}
-          <div className="relative flex-1 min-w-[140px] max-w-xs">
-            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Chercher un rayon / produit..."
-              className="w-full pl-8 pr-7 py-1 text-xs bg-zinc-950/70 border border-zinc-800 rounded-xl text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/50"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Right: View Mode & Zoom Actions */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Search Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(15);
+                setSearchOpen((o) => !o);
+              }}
+              title="Chercher un rayon"
+              className={`p-1.5 rounded-xl border text-xs transition ${
+                searchOpen || searchQuery
+                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                  : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300 hover:text-white'
+              }`}
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
+
             {/* View Mode Toggle: Guided vs All */}
             <button
               type="button"
@@ -326,7 +342,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                 setViewMode((m) => (m === 'guided' ? 'all' : 'guided'));
               }}
               title={viewMode === 'guided' ? 'Afficher tous les rayons' : 'Afficher seulement mes rayons'}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition ${
+              className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1 transition ${
                 viewMode === 'guided'
                   ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
                   : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-300 hover:text-white'
@@ -334,68 +350,89 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
             >
               {viewMode === 'guided' ? (
                 <>
-                  <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="hidden sm:inline">Mes rayons</span>
+                  <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
+                  <span className="text-[11px] sm:text-xs">Mes rayons</span>
                 </>
               ) : (
                 <>
-                  <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className="hidden sm:inline">Tous</span>
+                  <EyeOff className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400" />
+                  <span className="text-[11px] sm:text-xs">Tous</span>
                 </>
               )}
             </button>
+          </div>
+        </div>
 
-            {/* Recenter on Cart */}
-            <button
-              type="button"
-              onClick={() => handleCenterOnStep(currentStep)}
-              title="Centrer sur mon panier"
-              className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-300 hover:text-emerald-400 transition"
-            >
-              <Crosshair className="w-3.5 h-3.5" />
-            </button>
+        {/* Expandable Search Input Bar */}
+        {searchOpen && (
+          <div className="p-2 bg-zinc-900 border-b border-zinc-800/80 flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150">
+            <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0 ml-1" />
+            <input
+              type="text"
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Chercher un rayon, boeuf, pâtes, yaourts..."
+              className="flex-1 bg-zinc-950/80 border border-zinc-800 rounded-xl px-2.5 py-1 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/50"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="p-1 text-zinc-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
 
-            {/* Zoom Out */}
-            <button
-              type="button"
-              onClick={handleZoomOut}
-              disabled={zoomLevel <= 1}
-              title="Dézoomer"
-              className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 disabled:opacity-30 border border-zinc-700/60 text-zinc-300 transition"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Zoom In */}
+        {/* 2D Canvas Container with Floating Controls inside */}
+        <div
+          ref={mapContainerRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className={`relative w-full aspect-[1000/1024] bg-[#070a12] overflow-hidden select-none ${
+            zoomLevel > 1 ? 'cursor-grab active:cursor-grabbing touch-none' : ''
+          }`}
+        >
+          {/* Floating Map Controls Toolbar inside the canvas (Bottom Right) */}
+          <div className="absolute bottom-3 right-3 z-10 flex flex-col bg-zinc-900/90 backdrop-blur-md border border-zinc-700/80 rounded-2xl p-1 shadow-2xl space-y-1">
             <button
               type="button"
               onClick={handleZoomIn}
               disabled={zoomLevel >= 2.4}
               title="Zoomer"
-              className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 disabled:opacity-30 border border-zinc-700/60 text-zinc-300 transition"
+              className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white disabled:opacity-30 transition active:scale-95"
             >
-              <ZoomIn className="w-3.5 h-3.5" />
+              <ZoomIn className="w-4 h-4" />
             </button>
-
-            {/* Reset view */}
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              disabled={zoomLevel <= 1}
+              title="Dézoomer"
+              className="p-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white disabled:opacity-30 transition active:scale-95"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
             {zoomLevel > 1 && (
               <button
                 type="button"
                 onClick={handleResetView}
-                title="Réinitialiser la vue"
-                className="p-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-300 transition"
+                title="Vue complète"
+                className="p-1.5 rounded-xl hover:bg-zinc-800 text-emerald-400 hover:text-white transition active:scale-95 border-t border-zinc-800"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-        </div>
 
-        {/* 2D Canvas Container with Smooth Transition */}
-        <div className="relative w-full aspect-[1000/1024] max-h-[72vh] flex items-center justify-center bg-[#070a12] overflow-hidden">
           <svg
             viewBox={computedViewBox}
-            className="w-full h-full transition-[viewBox] duration-500 ease-out drop-shadow-2xl select-none"
+            className="w-full h-full block drop-shadow-2xl select-none"
             preserveAspectRatio="xMidYMid meet"
           >
             <defs>
@@ -1061,22 +1098,22 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
 
       {/* Selected Aisle Drawer / Checklist Panel */}
       {selectedAisle && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-4 sm:p-5 shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold text-lg shadow-inner">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-3.5 sm:p-5 shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-2 w-full max-w-full overflow-hidden">
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 gap-2 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold text-lg shadow-inner shrink-0">
                 {selectedAisle.emoji}
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <span>{selectedAisle.name}</span>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-bold text-white flex items-center gap-1.5 truncate">
+                  <span className="truncate">{selectedAisle.name}</span>
                   {selectedStep && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-emerald-400 border border-zinc-700/60 font-mono">
-                      Étape #{selectedStep.stepNumber}
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-emerald-400 border border-zinc-700/60 font-mono shrink-0">
+                      #{selectedStep.stepNumber}
                     </span>
                   )}
                 </h4>
-                <p className="text-[11px] text-zinc-400">
+                <p className="text-[11px] text-zinc-400 truncate">
                   {selectedStep
                     ? `${selectedStep.items.length} article(s) à récupérer`
                     : 'Rayon vide (aucun article dans la liste)'}
@@ -1086,7 +1123,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
 
             <button
               onClick={() => setSelectedAisleId(null)}
-              className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition shrink-0"
               aria-label="Fermer"
             >
               <X className="w-4 h-4" />
@@ -1095,11 +1132,11 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
 
           {/* List of items in this specific aisle */}
           {selectedStep && selectedStep.items.length > 0 ? (
-            <div className="space-y-2.5 mt-3 max-h-64 overflow-y-auto pr-1">
+            <div className="space-y-2 mt-3 max-h-60 overflow-y-auto pr-1">
               {selectedStep.items.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-150 ${
+                  className={`flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all duration-150 gap-2 min-w-0 ${
                     item.completed
                       ? 'bg-zinc-950/40 border-zinc-900 text-zinc-500 opacity-60'
                       : 'bg-zinc-800/70 hover:bg-zinc-800 border-zinc-700/60 text-white shadow-sm'
@@ -1107,35 +1144,36 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                 >
                   <div
                     onClick={() => onToggle(item.id)}
-                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                    className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
                   >
                     <div
-                      className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all ${
+                      className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
                         item.completed
                           ? 'bg-emerald-500 border-emerald-500 text-zinc-950 shadow-sm'
                           : 'border-zinc-600 bg-zinc-900/60'
                       }`}
                     >
-                      {item.completed && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      {item.completed && <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />}
                     </div>
 
-                    <div className="truncate flex-1">
+                    <div className="truncate flex-1 min-w-0">
                       <span
-                        className={`text-sm font-medium ${
+                        className={`text-xs sm:text-sm font-medium truncate block ${
                           item.completed ? 'line-through text-zinc-500' : 'text-zinc-100'
                         }`}
                       >
                         {item.name}
                       </span>
-                      {item.quantity && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-zinc-700/50 text-emerald-300 font-mono">
-                          {item.quantity}
-                        </span>
-                      )}
                     </div>
+
+                    {item.quantity && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-700/50 text-emerald-300 font-mono shrink-0">
+                        {item.quantity}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {/* Auto-learning reassign button */}
                     <button
                       type="button"
@@ -1144,16 +1182,16 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                       className="px-2 py-1 rounded-lg bg-zinc-900/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700/50 text-[10px] font-medium flex items-center gap-1 transition active:scale-95"
                     >
                       <MoveRight className="w-3 h-3 text-emerald-400" />
-                      <span>Déplacer</span>
+                      <span className="hidden xs:inline">Déplacer</span>
                     </button>
 
                     {item.completed ? (
-                      <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                      <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-0.5">
                         <CheckCircle2 className="w-3 h-3" />
-                        Pris
+                        <span className="hidden xs:inline">Pris</span>
                       </span>
                     ) : (
-                      <span className="text-[11px] text-zinc-400 font-medium">À prendre</span>
+                      <span className="text-[10px] sm:text-[11px] text-zinc-400 font-medium">À prendre</span>
                     )}
                   </div>
                 </div>
@@ -1167,10 +1205,10 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
 
           {/* Quick jump to next step button */}
           {selectedStep && (
-            <div className="mt-3.5 pt-3 border-t border-zinc-800/80 flex items-center justify-between">
-              <span className="text-[11px] text-zinc-500 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-emerald-400" />
-                {selectedStep.allCompleted ? 'Rayon terminé !' : 'Cochez au fur et à mesure'}
+            <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2 min-w-0">
+              <span className="text-[11px] text-zinc-500 flex items-center gap-1 truncate">
+                <Sparkles className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span className="truncate">{selectedStep.allCompleted ? 'Rayon terminé !' : 'Cochez au fur et à mesure'}</span>
               </span>
 
               {routeSteps.length > 1 && (
@@ -1179,9 +1217,9 @@ export const StoreMap: React.FC<StoreMapProps> = ({ items, onToggle }) => {
                   onClick={() => {
                     const currentIndex = routeSteps.findIndex((s) => s.aisle.id === selectedAisle.id);
                     const nextIndex = (currentIndex + 1) % routeSteps.length;
-                    handleCenterOnStep(routeSteps[nextIndex]);
+                    setSelectedAisleId(routeSteps[nextIndex].aisle.id);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1 transition active:scale-95"
+                  className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1 transition active:scale-95 shrink-0"
                 >
                   <span>Rayon suivant</span>
                   <ArrowRight className="w-3.5 h-3.5" />
