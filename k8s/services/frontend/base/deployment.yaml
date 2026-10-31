@@ -22,7 +22,7 @@ spec:
         - name: ghcr-login
       containers:
         - name: frontend
-          image: ghcr.io/victoragahi/agora-frontend:0914d9adbae3a18cf2698287c376329a242fdee6
+          image: ghcr.io/victoragahi/agora-frontend:f3106a13af0f41c32da28e5bafe31915ecad1e14
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
