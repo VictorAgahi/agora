@@ -1,10 +1,12 @@
 # Stage 1: Build the Go binary
-FROM golang:1.24-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /app
 
+ENV GOTOOLCHAIN=auto
+
 # Install ca-certificates and tzdata
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata git
 
 # Download dependencies
 COPY go.mod go.sum ./
