@@ -15,7 +15,7 @@ export const ItemList: React.FC<ItemListProps> = ({ items, onToggle, onDelete })
   const pendingItems = items.filter((it) => !it.completed);
   const completedItems = items.filter((it) => it.completed);
 
-  // Group pending items by category
+  // Group pending items by category ordered by physical store layout
   const groupedPending = pendingItems.reduce<Record<string, Item[]>>((acc, item) => {
     const cat = item.category || 'Autre';
     if (!acc[cat]) acc[cat] = [];
@@ -23,7 +23,22 @@ export const ItemList: React.FC<ItemListProps> = ({ items, onToggle, onDelete })
     return acc;
   }, {});
 
-  const categories = Object.keys(groupedPending).sort();
+  const CATEGORY_STORE_ORDER: Record<string, number> = {
+    'Fruits & Légumes': 10,
+    'Boulangerie': 20,
+    'Boissons': 30,
+    'Épicerie': 40,
+    'Maison & Hygiène': 50,
+    'Produits Frais': 60,
+    'Boucherie & Poisson': 70,
+    'Autre': 99,
+  };
+
+  const categories = Object.keys(groupedPending).sort((a, b) => {
+    const orderA = CATEGORY_STORE_ORDER[a] ?? 99;
+    const orderB = CATEGORY_STORE_ORDER[b] ?? 99;
+    return orderA - orderB;
+  });
 
   return (
     <div className="space-y-6">
