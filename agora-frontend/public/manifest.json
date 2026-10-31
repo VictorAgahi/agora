@@ -1,16 +1,28 @@
 {
   "short_name": "Agora",
-  "name": "Agora - Liste de courses partagée",
+  "name": "Agora - Liste de courses",
+  "description": "Liste de courses partagée et connectée à l'agent IA Hermes",
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
     {
       "src": "/favicon.svg",
       "type": "image/svg+xml",
-      "sizes": "512x512"
+      "sizes": "any"
     }
   ],
   "start_url": "/",
   "background_color": "#09090b",
-  "theme_color": "#16a34a",
+  "theme_color": "#09090b",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "scope": "/"
 }

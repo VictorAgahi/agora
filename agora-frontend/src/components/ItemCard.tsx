@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 import { Item } from '../types';
 
 interface ItemCardProps {
@@ -24,58 +24,78 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggle, onDelete }) 
 
   return (
     <div
-      className={`group flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-200 select-none ${
+      onClick={() => onToggle(item.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle(item.id);
+        }
+      }}
+      className={`group relative flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border cursor-pointer no-select transition-all duration-200 ease-out active:scale-[0.985] ${
         item.completed
-          ? 'bg-zinc-950/40 border-zinc-800/40 opacity-60'
-          : 'bg-zinc-900/90 hover:bg-zinc-900 border-zinc-800 hover:border-zinc-700 shadow-sm'
+          ? 'bg-zinc-950/40 border-zinc-900/60 opacity-60'
+          : 'bg-zinc-900/80 hover:bg-zinc-900 border-zinc-800/80 hover:border-zinc-700 shadow-sm'
       }`}
     >
-      <div
-        onClick={() => onToggle(item.id)}
-        className="flex items-center gap-3.5 flex-1 min-w-0 cursor-pointer"
-      >
-        {/* Checkbox button */}
-        <button
-          type="button"
-          aria-label={item.completed ? 'Marquer non fait' : 'Marquer acheté'}
+      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+        {/* Animated Checkbox */}
+        <div
           className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all duration-150 shrink-0 ${
             item.completed
-              ? 'bg-emerald-500 border-emerald-500 text-zinc-950 shadow-sm'
-              : 'border-zinc-700 hover:border-emerald-500/80 bg-zinc-800/50'
+              ? 'bg-emerald-500 border-emerald-500 text-zinc-950 shadow-sm shadow-emerald-500/25 animate-check-pop'
+              : 'border-zinc-700 hover:border-emerald-500/80 bg-zinc-800/60 group-hover:bg-zinc-800'
           }`}
         >
-          {item.completed && <Check className="w-4 h-4 stroke-[3]" />}
-        </button>
+          {item.completed && (
+            <Check className="w-4 h-4 stroke-[3] transition-transform scale-100" />
+          )}
+        </div>
 
-        {/* Text and badges */}
-        <div className="flex-1 min-w-0">
+        {/* Item details */}
+        <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span
-              className={`text-sm font-medium transition-all ${
-                item.completed ? 'line-through text-zinc-500' : 'text-zinc-100'
+              className={`text-sm font-medium transition-all duration-200 ${
+                item.completed
+                  ? 'line-through text-zinc-500 decoration-zinc-600/80'
+                  : 'text-zinc-100'
               }`}
             >
               {item.name}
             </span>
 
             {item.quantity && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-zinc-800 text-emerald-400 border border-zinc-700/60 shrink-0">
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border transition-colors ${
+                  item.completed
+                    ? 'bg-zinc-900 text-zinc-600 border-zinc-800'
+                    : 'bg-zinc-800/90 text-emerald-400 border-zinc-700/60'
+                }`}
+              >
                 {item.quantity}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {item.category && (
               <span
-                className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-md border ${badgeClass}`}
+                className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-md border transition-opacity ${
+                  item.completed ? 'opacity-40' : ''
+                } ${badgeClass}`}
               >
                 {item.category}
               </span>
             )}
 
             {item.notes && (
-              <span className="text-xs text-zinc-400 truncate max-w-[200px]">
+              <span
+                className={`text-xs truncate max-w-[200px] transition-colors ${
+                  item.completed ? 'text-zinc-600 line-through' : 'text-zinc-400'
+                }`}
+              >
                 {item.notes}
               </span>
             )}
@@ -83,17 +103,18 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggle, onDelete }) 
         </div>
       </div>
 
-      {/* Delete action */}
+      {/* Delete action button */}
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           onDelete(item.id);
         }}
-        className="opacity-0 group-hover:opacity-100 focus:opacity-100 sm:transition-opacity p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800/80"
+        className="opacity-60 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-950/30 active:scale-90"
         title="Supprimer"
         aria-label="Supprimer l'article"
       >
-        <X className="w-4 h-4" />
+        <Trash2 className="w-4 h-4" />
       </button>
     </div>
   );

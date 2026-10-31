@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Item } from '../types';
+import { triggerHaptic, playPopSound } from '../utils/feedback';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -40,7 +41,6 @@ export function useShoppingList() {
       setConnected(false);
     };
 
-    // When backend broadcasts changes, refresh list
     const handleRemoteChange = () => {
       fetchItems();
     };
@@ -57,17 +57,9 @@ export function useShoppingList() {
     };
   }, [fetchItems]);
 
-  const triggerHaptic = () => {
-    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(25);
-      } catch {
-        // Ignore vibration errors if blocked
-      }
-    }
-  };
-
   const addItem = async (name: string, quantity?: string, category?: string, notes?: string) => {
+    triggerHaptic(25);
+    playPopSound('tap');
     try {
       const res = await fetch(`${API_BASE}/api/items`, {
         method: 'POST',
@@ -75,7 +67,6 @@ export function useShoppingList() {
         body: JSON.stringify({ name, quantity, category, notes }),
       });
       if (!res.ok) throw new Error("Erreur lors de l'ajout");
-      triggerHaptic();
       await fetchItems();
     } catch (err: any) {
       setError(err.message);
@@ -84,10 +75,15 @@ export function useShoppingList() {
   };
 
   const toggleItem = async (id: number) => {
-    triggerHaptic();
-    // Optimistic UI update
+    const current = items.find((it) => it.id === id);
+    const willBeCompleted = current ? !current.completed : true;
+
+    triggerHaptic(20);
+    playPopSound(willBeCompleted ? 'check' : 'uncheck');
+
+    // Instant optimistic UI update
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, completed: !it.completed } : it))
+      prev.map((it) => (it.id === id ? { ...it, completed: willBeCompleted } : it))
     );
 
     try {
@@ -98,12 +94,13 @@ export function useShoppingList() {
       await fetchItems();
     } catch (err: any) {
       setError(err.message);
-      await fetchItems(); // Revert on error
+      await fetchItems(); // Revert on network failure
     }
   };
 
   const deleteItem = async (id: number) => {
-    triggerHaptic();
+    triggerHaptic(30);
+    playPopSound('tap');
     setItems((prev) => prev.filter((it) => it.id !== id));
     try {
       const res = await fetch(`${API_BASE}/api/items/${id}`, {
@@ -118,7 +115,8 @@ export function useShoppingList() {
   };
 
   const clearCompleted = async () => {
-    triggerHaptic();
+    triggerHaptic(40);
+    playPopSound('tap');
     try {
       const res = await fetch(`${API_BASE}/api/items/clear-completed`, {
         method: 'POST',

@@ -2,15 +2,26 @@
 <html lang="fr" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#09090b" />
+    
+    <!-- iOS Fullscreen & Standalone PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Agora" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- App Icons -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
     <link rel="manifest" href="/manifest.json" />
+
     <title>Agora - Liste de courses</title>
   </head>
-  <body class="bg-zinc-950 text-zinc-100 min-h-screen selection:bg-emerald-500 selection:text-white antialiased">
+  <body class="bg-zinc-950 text-zinc-100 min-h-[100dvh] selection:bg-emerald-500 selection:text-white antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
